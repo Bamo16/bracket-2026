@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ryan's 2026 Bracket — Family Pool Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0a0c10;--surface:#111318;--surface2:#181c24;--border:#1f2530;--border2:#2a3040;
+    --text:#e8eaf0;--muted:#6b7585;--win:#22c55e;--win-dim:#166534;--loss:#ef4444;
+    --loss-dim:#7f1d1d;--pending:#f59e0b;--pending-dim:#78350f;--live:#38bdf8;
+    --live-dim:#0c4a6e;--upset:#a78bfa;--upset-dim:#3b1f6e;--champ:#f59e0b;
+    --accent:#38bdf8;--pts:#fbbf24;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;font-size:13px;line-height:1.5;min-height:100vh}
+  body::before{content:'';position:fixed;inset:0;opacity:.025;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");pointer-events:none;z-index:0}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px 16px 60px;position:relative;z-index:1}
+  header{margin-bottom:28px}
+  .header-top{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  .title{font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:2px;line-height:1}
+  .title span{color:var(--champ)}
+  .subtitle{font-family:'Syne',sans-serif;font-size:11px;font-weight:600;letter-spacing:4px;text-transform:uppercase;color:var(--muted);margin-top:4px}
+  .header-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  .header-meta{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .meta-chip{background:var(--surface);border:1px solid var(--border2);border-radius:4px;padding:4px 10px;font-size:11px;color:var(--muted)}
+  .meta-chip strong{color:var(--text)}
+  .live-badge{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border2);border-radius:4px;padding:4px 10px;font-size:11px}
+  .live-badge.ok{color:var(--win);border-color:var(--win-dim)}
+  .live-badge.fetching{color:var(--accent);border-color:var(--live-dim)}
+  .live-badge.err{color:var(--loss);border-color:var(--loss-dim)}
+  .live-dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .last-updated{font-size:10px;color:var(--muted)}
+  .score-hero{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;background:var(--surface);border:1px solid var(--border2);border-top:3px solid var(--champ);border-radius:8px;padding:24px;margin-bottom:20px;align-items:center}
+  .score-block{text-align:center}
+  .score-label{font-family:'Syne',sans-serif;font-size:10px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+  .score-big{font-family:'Bebas Neue',sans-serif;font-size:64px;letter-spacing:1px;line-height:1}
+  .score-big.pts{color:var(--pts)}
+  .score-big.wins{color:var(--win)}
+  .score-divider{width:1px;height:80px;background:var(--border2);margin:0 auto}
+  .score-sub{font-size:11px;color:var(--muted);margin-top:4px}
+  .champ-box{grid-column:1/-1;display:flex;align-items:center;gap:12px;justify-content:center;padding-top:16px;border-top:1px solid var(--border);margin-top:8px;flex-wrap:wrap}
+  .champ-label{font-family:'Syne',sans-serif;font-size:10px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--muted)}
+  .champ-team{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--champ);letter-spacing:2px}
+  .champ-seed{font-size:11px;color:var(--muted);padding:2px 6px;border:1px solid var(--border2);border-radius:3px}
+  .champ-alive{font-size:11px;color:var(--win);background:rgba(34,197,94,.1);border:1px solid var(--win-dim);border-radius:3px;padding:2px 8px}
+  .status-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+  .stat-pill{background:var(--surface);border:1px solid var(--border2);border-radius:20px;padding:5px 14px;font-size:11px;display:flex;align-items:center;gap:6px}
+  .stat-pill .val{font-family:'Bebas Neue',sans-serif;font-size:16px;line-height:1}
+  .stat-pill.wins .val{color:var(--win)}
+  .stat-pill.losses .val{color:var(--loss)}
+  .stat-pill.upsets .val{color:var(--upset)}
+  .stat-pill .lbl{color:var(--muted);font-size:10px;font-family:'Syne',sans-serif;font-weight:600;letter-spacing:1px;text-transform:uppercase}
+  .tabs{display:flex;border-bottom:1px solid var(--border2);margin-bottom:20px;flex-wrap:wrap}
+  .tab{padding:8px 18px;font-family:'Syne',sans-serif;font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s}
+  .tab:hover{color:var(--text)}
+  .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab-panel{display:none}
+  .tab-panel.active{display:block}
+  .section{margin-bottom:24px}
+  .section-title{font-family:'Syne',sans-serif;font-size:10px;font-weight:800;letter-spacing:4px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);padding-bottom:8px;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+  .section-title::before{content:'';display:block;width:3px;height:14px;background:var(--accent);border-radius:2px;flex-shrink:0}
+  .games-table{width:100%;border-collapse:collapse}
+  .games-table thead th{font-family:'Syne',sans-serif;font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:6px 10px;text-align:left;border-bottom:1px solid var(--border)}
+  .games-table tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+  .games-table tbody tr:hover{background:var(--surface2)}
+  .games-table td{padding:10px;vertical-align:middle}
+  .time-cell{color:var(--muted);white-space:nowrap;font-size:12px}
+  .time-cell.upcoming{color:var(--pending)}
+  .time-cell.live-now{color:var(--live);font-weight:500}
+  .pick-team{font-weight:500}
+  .pick-team.my-pick{color:var(--accent)}
+  .seed-badge{display:inline-block;font-size:10px;color:var(--muted);border:1px solid var(--border2);border-radius:3px;padding:1px 5px;margin-right:4px;vertical-align:middle}
+  .upset-tag{font-size:9px;font-family:'Syne',sans-serif;font-weight:800;letter-spacing:1px;text-transform:uppercase;background:var(--upset-dim);color:var(--upset);border:1px solid var(--upset);border-radius:3px;padding:1px 5px;margin-left:6px}
+  .live-tag{font-size:9px;font-family:'Syne',sans-serif;font-weight:800;letter-spacing:1px;text-transform:uppercase;background:var(--live-dim);color:var(--live);border:1px solid var(--live);border-radius:3px;padding:1px 5px;margin-left:4px;animation:pulse 2s infinite}
+  .badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-family:'Syne',sans-serif;font-weight:700;letter-spacing:1px;border-radius:4px;padding:3px 8px}
+  .badge.win{background:rgba(34,197,94,.12);color:var(--win);border:1px solid var(--win-dim)}
+  .badge.loss{background:rgba(239,68,68,.12);color:var(--loss);border:1px solid var(--loss-dim)}
+  .badge.pending{background:rgba(245,158,11,.12);color:var(--pending);border:1px solid var(--pending-dim)}
+  .badge.live-badge-sm{background:rgba(56,189,248,.12);color:var(--live);border:1px solid var(--live-dim)}
+  .badge.busted{background:rgba(239,68,68,.07);color:var(--loss);border:1px solid var(--loss-dim);opacity:.7}
+  .pts-cell{text-align:right}
+  .pts-val{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--pts);line-height:1}
+  .pts-val.zero{color:var(--muted)}
+  .score-note{font-size:11px;color:var(--muted);margin-top:2px}
+  .live-score-inline{font-size:12px;color:var(--live);font-weight:500;margin-left:6px}
+  .api-banner{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:8px 14px;margin-bottom:16px;font-size:11px}
+  .api-banner.loading{border-color:var(--live-dim);color:var(--live)}
+  .api-banner.success{border-color:var(--win-dim);color:var(--win)}
+  .api-banner.error{border-color:var(--loss-dim);color:var(--loss)}
+  .spin{display:inline-block;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .path-chain{display:flex;align-items:stretch}
+  .path-node{flex:1;min-width:95px;background:var(--surface);border:1px solid var(--border2);padding:12px;position:relative}
+  .path-node:first-child{border-radius:6px 0 0 6px}
+  .path-node:last-child{border-radius:0 6px 6px 0}
+  .path-node+.path-node{border-left:none}
+  .path-node.done{border-top:2px solid var(--win)}
+  .path-node.now{border-top:2px solid var(--pending)}
+  .path-node.future{border-top:2px solid var(--border2);opacity:.5}
+  .path-round{font-family:'Syne',sans-serif;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+  .path-opp{font-size:11px;color:var(--text)}
+  .path-pts{font-family:'Bebas Neue',sans-serif;font-size:20px;line-height:1}
+  .path-pts.earned{color:var(--pts)}
+  .path-pts.possible{color:var(--muted)}
+  .path-sm{font-size:10px;margin-top:2px}
+  .path-sm.won{color:var(--win)}
+  .path-sm.up{color:var(--pending)}
+  .regions-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .region-card{background:var(--surface);border:1px solid var(--border2);border-radius:8px;overflow:hidden}
+  .region-header{padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)}
+  .region-name{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px}
+  .region-name.east{color:#60a5fa}.region-name.south{color:#34d399}.region-name.west{color:#f97316}.region-name.midwest{color:#c084fc}
+  .pick-row{display:flex;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid var(--border)}
+  .pick-row:first-child{border-top:none}
+  .pick-name{flex:1;font-size:12px}
+  .pick-name .team{color:var(--accent);font-weight:500}
+  .pick-seed-sm{font-size:10px;color:var(--muted);border:1px solid var(--border2);border-radius:3px;padding:1px 4px}
+  .pick-result-sm{margin-left:auto}
+  .scoring-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .rsc{background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:12px;text-align:center}
+  .rsc-round{font-family:'Syne',sans-serif;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+  .rsc-w{font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--pts);line-height:1}
+  .rsc-l{font-size:10px;color:var(--muted)}
+  .note-text{font-size:11px;color:var(--muted);font-style:italic;margin-top:8px;padding-left:10px;border-left:2px solid var(--border2)}
+  .divider{height:1px;background:var(--border);margin:24px 0}
+  @media(max-width:700px){.regions-grid{grid-template-columns:1fr}.score-hero{grid-template-columns:1fr 1fr}.score-divider{display:none}.path-chain{flex-direction:column}.path-node{min-width:unset;border-radius:0!important;border:1px solid var(--border2)!important;border-bottom:none!important}.path-node:last-child{border-bottom:1px solid var(--border2)!important}}
+  @media(max-width:500px){.title{font-size:36px}.score-big{font-size:48px}.scoring-grid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="header-top">
+      <div>
+        <div class="title">RYAN<span>'S</span> BRACKET</div>
+        <div class="subtitle">2026 NCAA March Madness — Family Pool</div>
+      </div>
+      <div class="header-right">
+        <div class="live-badge fetching" id="apiBadge"><span class="live-dot"></span><span id="apiBadgeText">Connecting…</span></div>
+        <div class="last-updated" id="lastUpdated">—</div>
+      </div>
+    </div>
+    <div class="header-meta">
+      <div class="meta-chip">Pool: <strong>Family (Bob's)</strong></div>
+      <div class="meta-chip">Scoring: <strong>Seed × Round Weight</strong></div>
+      <div class="meta-chip">Champion: <strong>Illinois #3</strong> 🏆</div>
+      <div class="meta-chip">Runner-Up: <strong>Duke #1</strong></div>
+      <div class="meta-chip">Times: <strong>Central (CDT)</strong></div>
+    </div>
+  </header>
+
+  <div class="score-hero">
+    <div class="score-block">
+      <div class="score-label">Total Points</div>
+      <div class="score-big pts" id="heroPoints">—</div>
+      <div class="score-sub" id="heroPointsSub">calculating…</div>
+    </div>
+    <div class="score-divider"></div>
+    <div class="score-block">
+      <div class="score-label">R1 Record</div>
+      <div class="score-big wins" id="heroRecord">—</div>
+      <div class="score-sub">picks correct</div>
+    </div>
+    <div class="champ-box">
+      <div class="champ-label">Champion pick</div>
+      <div class="champ-team">Illinois Fighting Illini</div>
+      <div class="champ-seed">#3 South</div>
+      <div class="champ-alive">✔ ALIVE — R1 WIN (105–70)</div>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <div class="stat-pill wins"><span class="val" id="statWins">—</span><span class="lbl">Wins</span></div>
+    <div class="stat-pill losses"><span class="val" id="statLosses">—</span><span class="lbl">Losses</span></div>
+    <div class="stat-pill upsets"><span class="val" id="statUpsets">—</span><span class="lbl">Upset Hits</span></div>
+    <div class="stat-pill"><span class="val" style="color:var(--loss);opacity:.7">2</span><span class="lbl">Busted Paths</span></div>
+    <div class="stat-pill" style="margin-left:auto"><span class="val" style="color:var(--pts)" id="statPts">—</span><span class="lbl">pts known</span></div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('today')">Live / Today</div>
+    <div class="tab" onclick="switchTab('r1')">R1 Results</div>
+    <div class="tab" onclick="switchTab('path')">Champion Path</div>
+    <div class="tab" onclick="switchTab('r2')">R2 Picks</div>
+    <div class="tab" onclick="switchTab('scoring')">Scoring Guide</div>
+  </div>
+
+  <!-- TODAY TAB -->
+  <div class="tab-panel active" id="tab-today">
+    <div id="apiBanner" class="api-banner loading"><span class="spin">⟳</span><span id="apiBannerMsg">Fetching live NCAA scores…</span></div>
+    <div class="section">
+      <div class="section-title">Friday March 20 — Your R1 Picks</div>
+      <table class="games-table">
+        <thead><tr><th>Time (CDT)</th><th>Your Pick</th><th>vs Opponent</th><th>Result / Score</th><th style="text-align:right">Pts</th></tr></thead>
+        <tbody id="todayBody"><tr><td colspan="5" style="color:var(--muted);padding:20px 10px;text-align:center">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- R1 TAB -->
+  <div class="tab-panel" id="tab-r1">
+    <div class="section">
+      <div class="section-title">Thursday March 19 — Confirmed Results</div>
+      <table class="games-table">
+        <thead><tr><th>Slot</th><th>Your Pick</th><th>Result</th><th>Score</th><th style="text-align:right">Pts</th></tr></thead>
+        <tbody id="thuBody"></tbody>
+      </table>
+    </div>
+    <div class="divider"></div>
+    <div class="section">
+      <div class="section-title">Busted Paths ⚠️</div>
+      <table class="games-table">
+        <thead><tr><th>Slot</th><th>Pick</th><th>What happened</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="time-cell">M5</td>
+            <td><span class="seed-badge">11</span><span class="pick-team">SMU</span></td>
+            <td><span class="badge busted">BUSTED</span><span class="score-note"> Miami (OH) won the play-in — SMU never played R1. Midwest has a hole.</span></td>
+          </tr>
+          <tr>
+            <td class="time-cell">M7</td>
+            <td><span class="seed-badge">10</span><span class="pick-team">Santa Clara</span></td>
+            <td><span class="badge loss">LOSS</span><span class="score-note"> Lost to Kentucky in OT. Second Midwest R2 path gone.</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- PATH TAB -->
+  <div class="tab-panel" id="tab-path">
+    <div class="section">
+      <div class="section-title">Illinois #3 — Full Championship Path</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Full run = <strong style="color:var(--pts)">114 pts</strong>. EV at pick time: 18.86 (best overall). Every round earns 3× what a #1-seed earns.</p>
+      <div class="path-chain">
+        <div class="path-node done"><div class="path-round">R1 · ×1</div><div class="path-opp">vs Penn #14</div><div class="path-pts earned">3</div><div class="path-sm won">✔ WON 105–70</div></div>
+        <div class="path-node now"><div class="path-round">R2 · ×2</div><div class="path-opp">vs VCU #11</div><div class="path-pts possible">6</div><div class="path-sm up">⏳ Sat/Sun</div></div>
+        <div class="path-node future"><div class="path-round">Sweet 16 · ×4</div><div class="path-opp">TBD</div><div class="path-pts possible">12</div><div class="path-sm up">Next week</div></div>
+        <div class="path-node future"><div class="path-round">Elite 8 · ×6</div><div class="path-opp">TBD</div><div class="path-pts possible">18</div><div class="path-sm up">Next week</div></div>
+        <div class="path-node future"><div class="path-round">Final Four · ×10</div><div class="path-opp">TBD</div><div class="path-pts possible">30</div><div class="path-sm up">Apr 4</div></div>
+        <div class="path-node future"><div class="path-round">Champ · ×15</div><div class="path-opp">TBD</div><div class="path-pts possible">45</div><div class="path-sm up">Apr 6</div></div>
+      </div>
+      <div class="note-text">Polymarket at pick time: 82.5% Sweet16, 40% Elite8. Dad has Houston (#2, 76pt full run) — we beat his ceiling by 38 pts if Illinois runs the table.</div>
+    </div>
+    <div class="divider"></div>
+    <div class="section">
+      <div class="section-title">Final Four Picks</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;max-width:500px">
+        <div style="background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:12px"><div style="font-size:10px;color:var(--muted);font-family:'Syne',sans-serif;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">East</div><div style="font-size:14px;color:#60a5fa">Duke <span style="color:var(--muted);font-size:11px">#1</span></div></div>
+        <div style="background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:12px"><div style="font-size:10px;color:var(--muted);font-family:'Syne',sans-serif;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">South</div><div style="font-size:14px;color:#34d399">Illinois <span style="color:var(--muted);font-size:11px">#3</span> 🏆</div></div>
+        <div style="background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:12px"><div style="font-size:10px;color:var(--muted);font-family:'Syne',sans-serif;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">West</div><div style="font-size:14px;color:#f97316">Arkansas <span style="color:var(--muted);font-size:11px">#4</span></div></div>
+        <div style="background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:12px"><div style="font-size:10px;color:var(--muted);font-family:'Syne',sans-serif;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">Midwest</div><div style="font-size:14px;color:#c084fc">Alabama <span style="color:var(--muted);font-size:11px">#4</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- R2 TAB -->
+  <div class="tab-panel" id="tab-r2">
+    <div class="section">
+      <div class="section-title">Round 2 Picks (Field of 32) — Weight ×2</div>
+      <div class="regions-grid">
+        <div class="region-card">
+          <div class="region-header"><div class="region-name east">East</div></div>
+          <div class="pick-row"><span class="pick-seed-sm">1</span><span class="pick-name"><span class="team">Duke</span></span><span class="pick-result-sm"><span class="badge pending">UPCOMING</span></span></div>
+          <div class="pick-row"><span class="pick-seed-sm">12</span><span class="pick-name"><span class="team">Northern Iowa</span><span class="upset-tag">upset</span></span><span class="pick-result-sm"><span class="badge pending">UPCOMING</span></span></div>
+          <div class="pick-row"><span class="pick-seed-sm">6</span><span class="pick-name"><span class="team">Louisville</span></span><span class="pick-result-sm"><span class="badge pending">UPCOMING</span></span></div>
+          <div class="pick-row"><span class="pick-seed-sm">7</span><span class="pick-name"><span class="team">UCLA</span></span><span class="pick-result-sm"><span class="badge pending">UPCOMING</span></span></div>
+        </div>
+        <div class="region-card">
+          <div class="region-header"><div class="region-name south">South</div></div>
+          <div class="pick-row"><span class="pick-seed-sm">1</span><span class="pick-name"><span class="team">Florida</span></span><span class="pick-result-sm"><span class="badge pending">UPCOMING</span></span></div>
+          <div class="pick-row"><span class="pick-seed-sm">5</span><span class="pick-name"><span class="team">Vanderbilt</span></span><span class="pick-result-sm"><span class="badge pending">UPCOMING</span></span></div>
+          <div class="pick-row"><span class="pick-seed-sm">3</span><span class="pick-name"><span class="team">Illinois</span> 🏆</span><span class="pick-result-sm"><span class="badge pending">UPCOMING</span></span></div>
+          <div class="pick-row"><span class="pick-seed-sm">10</span><span class="pick-name"><span class="team">Texas A&amp;M</span><span class="upset-tag">upset</span></span><span class="pick-result-sm"><span class="badge pending">UPCOMING</span></span></div>
+        </div>
+        <div class="region-card">
+          <div class="region-header"><div class="region-name west">West</div></div>
+          <div class="pick-row"><span class="pick-seed-sm">1</span><span class="pick-name"><span class="team">Arizona</span></span><span class="pick-result-sm"><span class="badge pending">UPCOMING</span></span></div>
+          <div class="pick-row"><span class="pick-seed-sm">4</span><span class="pick-name"><span class="team">Arkansas</span></span><span class="pick-result-sm"><span class="badge pending">UPCOMING</span></span></div>
+          <div class="pick-row"><span class="pick-seed-sm">11</span><span class="pick-name"><span class="team">NC State / Texas</span><span class="upset-tag">upset</span></span><span class="pick-result-sm"><span class="badge pending">UPCOMING</span></span></div>
+          <div class="pick-row"><span class="pick-seed-sm">10</span><span class="pick-name"><span class="team">Missouri</span><span class="upset-tag">upset</span></span><span class="pick-result-sm"><span class="badge pending">UPCOMING</span></span></div>
+        </div>
+        <div class="region-card">
+          <div class="region-header"><div class="region-name midwest">Midwest</div></div>
+          <div class="pick-row"><span class="pick-seed-sm">9</span><span class="pick-name"><span class="team">Saint Louis</span><span class="upset-tag">upset</span></span><span class="pick-result-sm"><span class="badge pending">UPCOMING</span></span></div>
+          <div style="padding:6px 14px;font-size:10px;color:var(--upset);font-style:italic">★ 18 pts if Saint Louis beats Michigan — biggest single-game upside left</div>
+          <div class="pick-row"><span class="pick-seed-sm">4</span><span class="pick-name"><span class="team">Alabama</span></span><span class="pick-result-sm"><span class="badge pending">UPCOMING</span></span></div>
+          <div class="pick-row" style="opacity:.35"><span class="pick-seed-sm">11</span><span class="pick-name"><span class="team">SMU</span></span><span class="pick-result-sm"><span class="badge busted">BUSTED</span></span></div>
+          <div class="pick-row" style="opacity:.35"><span class="pick-seed-sm">10</span><span class="pick-name"><span class="team">Santa Clara</span></span><span class="pick-result-sm"><span class="badge loss">LOST OT</span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCORING TAB -->
+  <div class="tab-panel" id="tab-scoring">
+    <div class="section">
+      <div class="section-title">Scoring — Pts = Seed# × Round Weight</div>
+      <div class="scoring-grid">
+        <div class="rsc"><div class="rsc-round">R1 · Field of 64</div><div class="rsc-w">×1</div><div class="rsc-l">32 games</div></div>
+        <div class="rsc"><div class="rsc-round">R2 · Field of 32</div><div class="rsc-w">×2</div><div class="rsc-l">16 games</div></div>
+        <div class="rsc"><div class="rsc-round">Sweet 16</div><div class="rsc-w">×4</div><div class="rsc-l">8 games</div></div>
+        <div class="rsc"><div class="rsc-round">Elite 8</div><div class="rsc-w">×6</div><div class="rsc-l">4 games</div></div>
+        <div class="rsc"><div class="rsc-round">Final Four</div><div class="rsc-w">×10</div><div class="rsc-l">2 games</div></div>
+        <div class="rsc"><div class="rsc-round">Championship</div><div class="rsc-w">×15</div><div class="rsc-l">1 game</div></div>
+      </div>
+      <div class="note-text">Upsets = big points. #12 seed wins R1 = 12 pts. #1 seed wins championship = 15 pts. Illinois winning it all = 45 pts just in the final. That's the whole thesis.</div>
+    </div>
+    <div class="divider"></div>
+    <div class="section">
+      <div class="section-title">Tiebreakers</div>
+      <div style="display:flex;flex-direction:column;gap:8px;max-width:500px">
+        <div style="display:flex;gap:10px;align-items:flex-start"><div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--accent);width:24px;flex-shrink:0">1</div><div style="font-size:12px;padding-top:4px">Most correct picks (63 max)</div></div>
+        <div style="display:flex;gap:10px;align-items:flex-start"><div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--accent);width:24px;flex-shrink:0">2</div><div style="font-size:12px;padding-top:4px">Most points in Championship (R6)</div></div>
+        <div style="display:flex;gap:10px;align-items:flex-start"><div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--accent);width:24px;flex-shrink:0">3</div><div style="font-size:12px;padding-top:4px">Most points in Final Four (R5), then backwards by round</div></div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="section">
+      <div class="section-title">Strategy Notes</div>
+      <div class="note-text">EV formula: Seed# × Round_Weight × P(reach and win). Illinois #3 ranked #1 overall at EV 18.86. Duke #1 ranked #8 at 13.92. Full Illinois run = 114 pts vs Duke's 38. Houston (dad's pick, #2 South) was #2 EV at 17.90 — full run = 76 pts. We outceiling dad by 38 pts if Illinois runs the table.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── BRACKET DATA ────────────────────────────────────────────────────────────
+
+const thursdayResults = [
+  {slot:'E1', pick:'Duke',          seed:1,  result:'WIN',  score:'71–65',           pts:1,  note:'Survived Siena scare'},
+  {slot:'E2', pick:'Ohio State',    seed:8,  result:'LOSS', score:'TCU 66–64',        pts:0,  note:'TCU upset'},
+  {slot:'E5', pick:'Louisville',    seed:6,  result:'WIN',  score:'83–79',            pts:6},
+  {slot:'E6', pick:'Michigan St',   seed:3,  result:'WIN',  score:'92–67',            pts:3},
+  {slot:'S3', pick:'Vanderbilt',    seed:5,  result:'WIN',  score:'78–68',            pts:5},
+  {slot:'S4', pick:'Nebraska',      seed:4,  result:'WIN',  score:'76–47',            pts:4},
+  {slot:'S5', pick:'VCU',           seed:11, result:'WIN',  score:'82–78',            pts:11, note:'UPSET HIT ⚡', upset:true},
+  {slot:'S6', pick:'Illinois',      seed:3,  result:'WIN',  score:'105–70',           pts:3,  note:'Champion alive 🏆'},
+  {slot:'S7', pick:'Texas A&M',     seed:10, result:'WIN',  score:'63–50',            pts:10, note:'UPSET HIT ⚡', upset:true},
+  {slot:'S8', pick:'Houston',       seed:2,  result:'WIN',  score:'78–47',            pts:2},
+  {slot:'W3', pick:'Wisconsin',     seed:5,  result:'LOSS', score:'High Point 83–82', pts:0,  note:'High Point stunner'},
+  {slot:'W4', pick:'Arkansas',      seed:4,  result:'WIN',  score:'97–78',            pts:4},
+  {slot:'W5', pick:'NC State slot', seed:11, result:'WIN',  score:'Texas 79–71',      pts:11, note:'UPSET HIT ⚡ Texas won play-in + R1', upset:true},
+  {slot:'W6', pick:'Gonzaga',       seed:3,  result:'WIN',  score:'73–64',            pts:3},
+  {slot:'M1', pick:'Michigan',      seed:1,  result:'WIN',  score:'101–80',           pts:1},
+  {slot:'M2', pick:'Saint Louis',   seed:9,  result:'WIN',  score:'102–77',           pts:9,  note:'UPSET HIT ⚡ Now plays Michigan in R2!', upset:true},
+];
+
+// Friday picks. result/score/pts come from handoff for known games;
+// TBD games get enriched by the live API.
+const fridayPicks = [
+  {slot:'M7', pick:'Santa Clara',   seed:10, opp:'Kentucky',         opp_seed:7,  time:'Early',    result:'LOSS', score:'Lost to Kentucky in OT', pts:0},
+  {slot:'M3', pick:'Texas Tech',    seed:5,  opp:'Akron',            opp_seed:12, time:'Early',    result:'WIN',  score:'~48–37 (leading at handoff)', pts:5},
+  {slot:'W1', pick:'Arizona',       seed:1,  opp:'LIU',              opp_seed:16, time:'Early',    result:'WIN',  score:'24–12 1H (leading at handoff)', pts:1},
+  {slot:'M6', pick:'Virginia',      seed:3,  opp:'Wright State',     opp_seed:14, time:'Early',    result:'TBD',  score:'', pts:0, match:['Virginia','Wright State']},
+  {slot:'M8', pick:'Iowa State',    seed:2,  opp:'Tenn. State',      opp_seed:15, time:'1:50 PM',  result:'TBD',  score:'', pts:0, match:['Iowa State','Tennessee State']},
+  {slot:'M4', pick:'Alabama',       seed:4,  opp:'Hofstra',          opp_seed:13, time:'2:15 PM',  result:'TBD',  score:'', pts:0, match:['Alabama','Hofstra']},
+  {slot:'W2', pick:'Utah State',    seed:9,  opp:'Villanova',        opp_seed:8,  time:'3:10 PM',  result:'TBD',  score:'', pts:0, upset:true, match:['Utah State','Villanova']},
+  {slot:'M5', pick:'Tennessee',     seed:6,  opp:'Miami (OH)',       opp_seed:11, time:'3:25 PM',  result:'TBD',  score:'', pts:0, match:['Tennessee','Miami (OH)','Miami Ohio']},
+  {slot:'S2', pick:'Iowa',          seed:9,  opp:'Clemson',          opp_seed:8,  time:'5:50 PM',  result:'TBD',  score:'', pts:0, upset:true, match:['Iowa','Clemson']},
+  {slot:'E3', pick:'Northern Iowa', seed:12, opp:"St. John's",       opp_seed:5,  time:'6:10 PM',  result:'TBD',  score:'', pts:0, upset:true, match:['Northern Iowa',"St. John's",'Saint Johns']},
+  {slot:'E7', pick:'UCLA',          seed:7,  opp:'UCF',              opp_seed:10, time:'6:25 PM',  result:'TBD',  score:'', pts:0, match:['UCLA','UCF','Central Florida']},
+  {slot:'W8', pick:'Purdue',        seed:2,  opp:'Queens',           opp_seed:15, time:'6:35 PM',  result:'TBD',  score:'', pts:0, match:['Purdue','Queens']},
+  {slot:'S1', pick:'Florida',       seed:1,  opp:'Prairie View A&M', opp_seed:16, time:'8:25 PM',  result:'TBD',  score:'', pts:0, match:['Florida','Prairie View']},
+  {slot:'E4', pick:'Kansas',        seed:4,  opp:'Cal Baptist',      opp_seed:13, time:'8:45 PM',  result:'TBD',  score:'', pts:0, match:['Kansas','California Baptist','Cal Baptist']},
+  {slot:'E8', pick:'Connecticut',   seed:2,  opp:'Furman',           opp_seed:15, time:'9:00 PM',  result:'TBD',  score:'', pts:0, match:['Connecticut','UConn','Furman']},
+  {slot:'W7', pick:'Missouri',      seed:10, opp:'Miami FL',         opp_seed:7,  time:'9:10 PM',  result:'TBD',  score:'', pts:0, upset:true, match:['Missouri','Miami']},
+];
+
+// ─── NCAA API ─────────────────────────────────────────────────────────────────
+
+const API = 'https://ncaa-api.henrygd.me';
+const POLL_MS = 90000;
+
+function norm(s){ return (s||'').toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim(); }
+
+function teamsMatch(a, b){
+  const na = norm(a), nb = norm(b);
+  if(na===nb) return true;
+  if(na.includes(nb)||nb.includes(na)) return true;
+  const al={'uconn':'connecticut','connecticut':'uconn','ucf':'central florida','central florida':'ucf','cal baptist':'california baptist','california baptist':'cal baptist','miami oh':'miami ohio','miami ohio':'miami oh','tenn state':'tennessee state','tennessee state':'tenn state'};
+  return (al[na]||na).includes(nb)||(al[nb]||nb).includes(na);
+}
+
+function setbadge(cls, txt){
+  document.getElementById('apiBadge').className='live-badge '+cls;
+  document.getElementById('apiBadgeText').textContent=txt;
+}
+
+function setBanner(cls, html){
+  const el=document.getElementById('apiBanner');
+  el.className='api-banner '+cls;
+  document.getElementById('apiBannerMsg').innerHTML=html;
+}
+
+function nowCDT(){
+  return new Date().toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'2-digit',minute:'2-digit'});
+}
+
+function todayMMDD(){
+  const d=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Chicago'}));
+  return String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+function yyyyMM(){
+  const d=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Chicago'}));
+  return {year:d.getFullYear(), month:String(d.getMonth()+1).padStart(2,'0')};
+}
+
+async function fetchScores(){
+  const {year,month}=yyyyMM();
+  const url=`${API}/scoreboard/basketball-men/d1/${year}/${month}/all-conf`;
+  setbadge('fetching','Refreshing…');
+  try{
+    const r=await fetch(url,{cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const data=await r.json();
+    const mmdd=todayMMDD();
+    // games[] can be {game:{...}} or flat
+    const all=(data.games||[]).map(g=>g.game||g);
+    const today=all.filter(g=>{
+      const cd=(g.contestDate||g.startDate||'').replace(/\//g,'-');
+      return cd.startsWith(mmdd)||cd.includes('-'+mmdd.replace('-','-'));
+    });
+
+    // Apply to fridayPicks
+    for(const pick of fridayPicks){
+      if(!pick.match||pick.result!=='TBD') continue;
+      const game=today.find(g=>{
+        const h=norm(g.home?.names?.short||g.home?.name||'');
+        const a=norm(g.away?.names?.short||g.away?.name||'');
+        return pick.match.some(t=>teamsMatch(t,h)||teamsMatch(t,a));
+      });
+      if(!game) continue;
+      const gs=game.gameState||'';
+      const home=game.home||{}, away=game.away||{};
+      const hs=parseInt(home.score,10)||0, as=parseInt(away.score,10)||0;
+      const hName=norm(home.names?.short||home.name||'');
+      const pickIsHome=pick.match.some(t=>teamsMatch(t,hName));
+      const mySc=pickIsHome?hs:as, oppSc=pickIsHome?as:hs;
+      const period=game.currentPeriod||game.period||'';
+
+      if(gs==='final'||gs==='F'){
+        const won=mySc>oppSc;
+        pick.result=won?'WIN':'LOSS';
+        pick.score=`${mySc}–${oppSc} (Final)`;
+        pick.pts=won?pick.seed:0;
+        pick._live=null;
+      } else if(gs==='live'||gs==='in_progress'||gs==='L'){
+        pick._live={score:`${mySc}–${oppSc}`,period,leading:mySc>oppSc};
+      }
+    }
+
+    const t=nowCDT();
+    setbadge('ok','Live — '+t+' CDT');
+    document.getElementById('lastUpdated').textContent='Last synced: '+t+' CDT';
+    setBanner('success','NCAA scores loaded — auto-refresh every 90s');
+  } catch(e){
+    setbadge('err','API unavailable — retrying');
+    setBanner('error','NCAA API error: '+e.message+'. Showing handoff data. Retrying…');
+  }
+  renderTodayTable();
+  computeStats();
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+
+function renderTodayTable(){
+  const tbody=document.getElementById('todayBody');
+  tbody.innerHTML='';
+  for(const g of fridayPicks){
+    const tr=document.createElement('tr');
+    const live=g._live;
+    const isLive=!!live;
+    const timeClass=isLive?'time-cell live-now':(g.result==='TBD'?'time-cell upcoming':'time-cell');
+    const timeTxt=isLive?`<span class="live-tag">LIVE</span>`:g.time;
+    let resultHtml;
+    if(isLive){
+      const arr=live.leading?'▲':'▼';
+      resultHtml=`<span class="badge live-badge-sm">LIVE ${live.period||''}</span><span class="live-score-inline">${g.pick} ${live.score} ${arr}</span>`;
+    } else if(g.result==='WIN'){
+      resultHtml=`<span class="badge win">WIN</span>`+(g.score?`<span class="score-note"> ${g.score}</span>`:'');
+    } else if(g.result==='LOSS'){
+      resultHtml=`<span class="badge loss">LOSS</span>`+(g.score?`<span class="score-note"> ${g.score}</span>`:'');
+    } else {
+      resultHtml=`<span class="badge pending">TBD</span>`+(g.score?`<span class="score-note"> ${g.score}</span>`:'');
+    }
+    const note=g.note?`<div class="score-note">${g.note}</div>`:'';
+    const upset=g.upset?`<span class="upset-tag">upset pick</span>`:'';
+    const ptsNum=isLive?'?':(g.pts>0?g.pts:(g.result==='TBD'?'?':'0'));
+    const ptsCls=(g.pts>0&&!isLive)?'pts-val':'pts-val zero';
+    tr.innerHTML=`
+      <td class="${timeClass}">${timeTxt}<br><span style="font-size:10px;color:var(--muted)">${g.slot}</span></td>
+      <td><span class="seed-badge">${g.seed}</span><span class="pick-team my-pick">${g.pick}</span>${upset}</td>
+      <td><span class="seed-badge">${g.opp_seed||'?'}</span><span class="pick-team">${g.opp||'—'}</span></td>
+      <td>${resultHtml}${note}</td>
+      <td class="pts-cell"><span class="${ptsCls}">${ptsNum}</span><br><span style="font-size:10px;color:var(--muted)">pts</span></td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+function renderThuTable(){
+  const tbody=document.getElementById('thuBody');
+  tbody.innerHTML='';
+  for(const g of thursdayResults){
+    const tr=document.createElement('tr');
+    const badge=g.result==='WIN'?'<span class="badge win">WIN</span>':'<span class="badge loss">LOSS</span>';
+    const upset=g.upset?'<span class="upset-tag">upset hit</span>':'';
+    const note=g.note?`<div class="score-note">${g.note}</div>`:'';
+    const ptsCls=g.pts>0?'pts-val':'pts-val zero';
+    tr.innerHTML=`
+      <td class="time-cell">${g.slot}</td>
+      <td><span class="seed-badge">${g.seed}</span><span class="pick-team">${g.pick}</span>${upset}</td>
+      <td>${badge}</td>
+      <td>${g.score}${note}</td>
+      <td class="pts-cell"><span class="${ptsCls}">${g.pts}</span><br><span style="font-size:10px;color:var(--muted)">pts</span></td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+function computeStats(){
+  const thuW=thursdayResults.filter(g=>g.result==='WIN').length;
+  const thuL=thursdayResults.filter(g=>g.result==='LOSS').length;
+  const thuU=thursdayResults.filter(g=>g.upset&&g.result==='WIN').length;
+  const thuP=thursdayResults.reduce((s,g)=>s+g.pts,0);
+  const friK=fridayPicks.filter(g=>g.result!=='TBD');
+  const friW=friK.filter(g=>g.result==='WIN').length;
+  const friL=friK.filter(g=>g.result==='LOSS').length;
+  const friU=fridayPicks.filter(g=>g.upset&&g.result==='WIN').length;
+  const friP=friK.reduce((s,g)=>s+g.pts,0);
+  const W=thuW+friW,L=thuL+friL,U=thuU+friU,P=thuP+friP;
+  document.getElementById('statWins').textContent=W;
+  document.getElementById('statLosses').textContent=L;
+  document.getElementById('statUpsets').textContent=U;
+  document.getElementById('statPts').textContent=P;
+  document.getElementById('heroRecord').textContent=W+'–'+L;
+  document.getElementById('heroPoints').textContent=P;
+  document.getElementById('heroPointsSub').textContent='confirmed pts · live games pending';
+}
+
+function switchTab(id){
+  const tabs=['today','r1','path','r2','scoring'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',tabs[i]===id));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='tab-'+id));
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+renderThuTable();
+renderTodayTable();
+computeStats();
+fetchScores();
+setInterval(fetchScores, POLL_MS);
+</script>
+</body>
+</html>
