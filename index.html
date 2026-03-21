@@ -1962,6 +1962,8 @@
         var clock = (ev.status && ev.status.displayClock) || "";
         var network = evNetwork(ev);
         var pick = picks ? picks[matchId] : null;
+        var round = parseInt(matchId[1], 10);
+        var weight = ROUND_WEIGHTS[round];
 
         var scores = comps.map(function (c) {
           return parseInt(c.score || 0, 10);
@@ -1988,11 +1990,27 @@
             c.team.name ||
             (slug ? slugName(slug) : "TBD");
           var lead = i === leadIdx;
-          var pickTag = "";
-          if (pick && slug === pick) {
-            pickTag = lead
-              ? '<span class="pick-tag winning">YOUR PICK</span>'
-              : '<span class="pick-tag losing">YOUR PICK</span>';
+          var isMyPick = pick && slug === pick;
+          var pickAlive3 = isMyPick ? isTeamAlive(slug) : false;
+          var potPts = isMyPick && seed && pickAlive3 ? seed * weight : null;
+          var pickTag;
+          if (isMyPick) {
+            if (!pickAlive3) {
+              pickTag =
+                ' <span class="pick-tag losing">YOUR PICK · 0pt ✗ out</span>';
+            } else if (lead) {
+              pickTag =
+                ' <span class="pick-tag winning">YOUR PICK' +
+                (potPts ? " · " + potPts + "pt" : "") +
+                "</span>";
+            } else {
+              pickTag =
+                ' <span class="pick-tag losing">YOUR PICK' +
+                (potPts ? " · " + potPts + "pt" : "") +
+                "</span>";
+            }
+          } else {
+            pickTag = "";
           }
           html += '<div class="team-row">';
           html += "<span>" + (slug ? slugLogo(slug, 28) : "") + "</span>";
@@ -2003,7 +2021,6 @@
             (lead ? "leading" : "trailing") +
             '">' +
             name +
-            " " +
             pickTag +
             "</span>";
           html +=
@@ -2049,12 +2066,22 @@
               c.team.name ||
               (slug ? slugName(slug) : "?");
           var isMyPick = !isTBD && pick && slug === pick;
-          var potPts = isMyPick && seed ? seed * weight : null;
-          var pickTag = isMyPick
-            ? ' <span class="pick-tag neutral">YOUR PICK' +
-              (potPts ? " \xb7 " + potPts + "pt" : "") +
-              "</span>"
-            : "";
+          var pickAlive2 = isMyPick ? isTeamAlive(slug) : false;
+          var potPts = isMyPick && seed && pickAlive2 ? seed * weight : null;
+          var pickTag;
+          if (isMyPick) {
+            if (!pickAlive2) {
+              pickTag =
+                ' <span class="pick-tag losing">YOUR PICK · 0pt ✗ out</span>';
+            } else {
+              pickTag =
+                ' <span class="pick-tag neutral">YOUR PICK' +
+                (potPts ? " · " + potPts + "pt" : "") +
+                "</span>";
+            }
+          } else {
+            pickTag = "";
+          }
           html += '<div class="team-row">';
           html += "<span>" + (slug ? slugLogo(slug, 28) : "") + "</span>";
           if (seed !== null)
@@ -2209,8 +2236,25 @@
             var timeStr = fmtTime(gItem.dateStr, selectedTZ);
             var network = evNetwork(gItem.ev);
             var pick = picks ? picks[gItem.matchId] : null;
-            var potPts =
-              pick && TEAM_INFO[pick] ? String(TEAM_INFO[pick].seed) : "—";
+            var futRound = parseInt(gItem.matchId[1], 10);
+            var futWeight = ROUND_WEIGHTS[futRound];
+            var pickSeedF =
+              pick && TEAM_INFO[pick] ? TEAM_INFO[pick].seed : null;
+            var pickAlive = pick ? isTeamAlive(pick) : false;
+            var potPts;
+            if (!pick || pickSeedF === null) {
+              potPts = '<span style="color:var(--muted2)">—</span>';
+            } else if (!pickAlive) {
+              potPts =
+                '<span style="color:var(--loss);font-family:\'DM Mono\',monospace;font-weight:700" title="' +
+                slugName(pick) +
+                ' already eliminated">0 <span style="font-size:10px;font-weight:400">✗ out</span></span>';
+            } else {
+              potPts =
+                '<span style="color:var(--win)">' +
+                pickSeedF * futWeight +
+                "</span>";
+            }
 
             html += '<tr class="' + (pick ? "has-pick" : "") + '">';
             html +=
