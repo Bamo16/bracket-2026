@@ -1,0 +1,1472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Bracket Tracker 2026 — Bob's Family Pool</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f5f4f0;
+      --surface: #fff;
+      --surface2: #f0ede8;
+      --border: #e0dbd2;
+      --border2: #ccc7bc;
+      --text: #1a1814;
+      --muted: #7a7268;
+      --muted2: #a09890;
+      --accent: #e8420a;
+      --accent2: #ff6b35;
+      --gold: #c8960a;
+      --win: #1a7a3c;
+      --win-bg: #eaf6ef;
+      --win-border: #a8d8ba;
+      --loss: #c0392b;
+      --loss-bg: #fdf0ee;
+      --loss-border: #e8b4ae;
+      --pending: #b07d18;
+      --pending-bg: #fdf6e3;
+      --pending-border: #e8d098;
+      --live: #0070c9;
+      --live-bg: #e8f4fd;
+      --live-border: #90c8f0;
+      --max-w: 1080px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Barlow', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* Noise overlay */
+    #noise { position: fixed; inset: 0; pointer-events: none; z-index: 9999; opacity: 0.03; }
+
+    /* Wrapper */
+    .wrap { max-width: var(--max-w); margin: 0 auto; padding: 0 16px; }
+
+    /* ── Masthead ── */
+    #masthead { background: var(--surface); border-bottom: 3px solid var(--text); padding: 16px 0; }
+    #masthead .inner {
+      max-width: var(--max-w); margin: 0 auto; padding: 0 16px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .pool-label {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.15em;
+      color: var(--accent); text-transform: uppercase;
+    }
+    .masthead-title {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 48px; font-weight: 900; line-height: 1;
+      text-transform: uppercase; letter-spacing: -0.01em;
+    }
+    .masthead-title span { color: var(--accent); }
+    .masthead-right { text-align: right; }
+    .api-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 12px; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; padding: 4px 10px;
+      border-radius: 4px; border: 1px solid;
+    }
+    .api-badge.ok    { color: var(--win);  border-color: var(--win-border);  background: var(--win-bg);  }
+    .api-badge.sync  { color: var(--live); border-color: var(--live-border); background: var(--live-bg); }
+    .api-badge.err   { color: var(--loss); border-color: var(--loss-border); background: var(--loss-bg); }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .api-badge.ok .dot, .api-badge.sync .dot { animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .sync-time { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+    /* ── Score Ticker ── */
+    #ticker {
+      background: var(--text); color: #fff;
+      padding: 9px 0; overflow: hidden;
+      display: flex; align-items: center;
+    }
+    .ticker-label {
+      flex-shrink: 0;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 11px; font-weight: 800; letter-spacing: 0.15em;
+      background: var(--accent); color: #fff;
+      padding: 3px 14px 3px 16px; margin-right: 8px;
+      clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%);
+    }
+    .ticker-viewport { overflow: hidden; flex: 1; }
+    .ticker-track {
+      display: inline-flex; white-space: nowrap;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 13px; font-weight: 600;
+      animation: tick linear infinite;
+    }
+    .ticker-track:hover { animation-play-state: paused; }
+    @keyframes tick { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+    .ticker-item { padding: 0 28px; display: inline-flex; align-items: center; gap: 8px; }
+    .ticker-item + .ticker-item { border-left: 1px solid rgba(255,255,255,.15); }
+    .ticker-live-badge {
+      font-size: 10px; font-weight: 800; letter-spacing: .1em;
+      color: var(--live); background: var(--live-bg);
+      padding: 1px 5px; border-radius: 3px;
+      animation: pulse 1s ease-in-out infinite;
+    }
+    .ticker-score { color: var(--accent2); font-weight: 800; }
+    .ticker-note  { color: var(--muted2); font-size: 11px; }
+
+    /* ── Participant Bar ── */
+    #pbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 0; }
+    #pbar .inner {
+      max-width: var(--max-w); margin: 0 auto; padding: 0 16px;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .pbar-label {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 11px; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--muted);
+    }
+    select, #share-btn {
+      font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 600;
+      border: 1px solid var(--border2); border-radius: 4px;
+      padding: 5px 10px; background: var(--surface2); color: var(--text); cursor: pointer;
+    }
+    select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    #share-btn { letter-spacing: .08em; text-transform: uppercase; font-size: 12px; }
+    #share-btn:hover { background: var(--border2); }
+    .pbar-tz { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+    /* ── Tab Bar ── */
+    #tabbar {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 100;
+    }
+    #tabbar .inner {
+      max-width: var(--max-w); margin: 0 auto; padding: 0 16px; display: flex;
+    }
+    .tab-btn {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      padding: 12px 16px; border: none; background: none; cursor: pointer;
+      color: var(--muted); border-bottom: 3px solid transparent;
+      margin-bottom: -1px; transition: color .15s;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ── Tab Panels ── */
+    .tab-panel { display: none; padding: 24px 0; }
+    .tab-panel.active { display: block; }
+
+    /* ── Shared ── */
+    .section-block { margin-bottom: 32px; }
+    .section-hdr { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .section-hdr h2 {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 18px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+    }
+    .live-badge {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 11px; font-weight: 800; letter-spacing: .1em;
+      color: var(--live); background: var(--live-bg); border: 1px solid var(--live-border);
+      padding: 2px 7px; border-radius: 3px; animation: pulse 1s ease-in-out infinite;
+    }
+    .final-badge {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 11px; font-weight: 800; letter-spacing: .1em;
+      color: var(--muted); background: var(--surface2); border: 1px solid var(--border);
+      padding: 2px 7px; border-radius: 3px;
+    }
+    .empty-state {
+      text-align: center; padding: 40px;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 14px; color: var(--muted2); letter-spacing: .05em;
+    }
+    .team-logo { border-radius: 2px; object-fit: contain; vertical-align: middle; }
+    .seed-chip {
+      font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 500;
+      background: var(--surface2); color: var(--muted);
+      border: 1px solid var(--border); border-radius: 3px;
+      padding: 0 4px; line-height: 16px; display: inline-block;
+    }
+    .pick-tag {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 10px; font-weight: 800; letter-spacing: .08em;
+      padding: 1px 6px; border-radius: 3px; text-transform: uppercase;
+    }
+    .pick-tag.winning { color: var(--win);  background: var(--win-bg);  border: 1px solid var(--win-border);  }
+    .pick-tag.losing  { color: var(--loss); background: var(--loss-bg); border: 1px solid var(--loss-border); }
+    .pick-tag.neutral { color: var(--accent); background: var(--pending-bg); border: 1px solid var(--pending-border); }
+
+    /* ── Standings ── */
+    .standings-table { width: 100%; border-collapse: collapse; }
+    .standings-table th {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--muted); padding: 8px 12px; border-bottom: 2px solid var(--border);
+      text-align: left; white-space: nowrap;
+    }
+    .standings-table th.right, .standings-table td.right { text-align: right; }
+    .standings-table td {
+      padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle;
+    }
+    .standings-table tr:last-child td { border-bottom: none; }
+    .standings-table tr.you-row  { background: #fdf8e8; }
+    .standings-table tbody tr:hover td { background: var(--surface2); }
+    .standings-table tbody tr.you-row:hover td { background: #f9f1d0; }
+    .rank-cell {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 15px; font-weight: 800; text-align: center; width: 44px;
+    }
+    .rank-1 { color: #c8960a; }
+    .rank-2 { color: #8a8a8a; }
+    .rank-3 { color: #a0522d; }
+    .name-cell { font-weight: 600; font-size: 15px; }
+    .you-badge {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 10px; font-weight: 800; letter-spacing: .1em;
+      background: var(--accent); color: #fff;
+      padding: 1px 6px; border-radius: 3px; margin-left: 6px;
+    }
+    .pts-cell {
+      font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 700;
+      color: var(--gold); text-align: right;
+    }
+    .wl-cell { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--muted); white-space: nowrap; }
+    .finalist-cell {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 10px; border-radius: 4px; border-left: 3px solid;
+      font-size: 13px; font-weight: 600; white-space: nowrap;
+    }
+    .finalist-cell.alive {
+      border-left-color: var(--win);
+      background: linear-gradient(90deg, var(--win-bg) 0%, transparent 100%);
+    }
+    .finalist-cell.out {
+      border-left-color: var(--loss);
+      background: linear-gradient(90deg, var(--loss-bg) 0%, transparent 100%);
+    }
+    .finalist-badge {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 10px; font-weight: 800; letter-spacing: .1em;
+      padding: 1px 5px; border-radius: 3px;
+    }
+    .finalist-badge.alive { color: var(--win);  background: var(--win-bg);  border: 1px solid var(--win-border);  }
+    .finalist-badge.out   { color: var(--loss); background: var(--loss-bg); border: 1px solid var(--loss-border); }
+
+    /* ── Card grids ── */
+    .card-grid    { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+    .card-grid.sm { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+
+    /* Live card */
+    .game-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px;
+    }
+    .game-card.live-card { border-color: var(--live-border); border-top: 3px solid var(--live); }
+    .card-top {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 12px; font-weight: 700; letter-spacing: .08em; color: var(--muted); text-transform: uppercase;
+    }
+    .card-clock { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--live); font-weight: 500; }
+    .team-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+    .team-row + .team-row { border-top: 1px solid var(--border); }
+    .team-name { flex: 1; font-weight: 600; font-size: 14px; }
+    .team-name.leading { font-weight: 700; }
+    .team-name.trailing { color: var(--muted); }
+    .team-score { font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 500; min-width: 36px; text-align: right; }
+    .team-score.leading  { font-weight: 700; color: var(--text); }
+    .team-score.trailing { color: var(--muted); }
+
+    /* Upcoming card */
+    .upc-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+    .upc-time { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--pending); font-weight: 500; margin-bottom: 8px; }
+    .upc-matchup { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; flex-wrap: wrap; }
+    .upc-vs { font-family: 'Barlow Condensed', sans-serif; font-size: 11px; color: var(--muted2); font-weight: 600; }
+    .upc-pick { font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: .05em; color: var(--accent); margin-top: 6px; }
+    .upc-network { font-family: 'Barlow Condensed', sans-serif; font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+    /* Completed card */
+    .cmp-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+    .cmp-top {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 12px; font-weight: 700; letter-spacing: .08em; color: var(--muted); text-transform: uppercase;
+    }
+    .cmp-score { font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 500; }
+    .team-row.winner { opacity: 1; }
+    .team-row.loser  { opacity: .5; }
+
+    /* ── Future table ── */
+    .future-table { width: 100%; border-collapse: collapse; }
+    .future-table th {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--muted); padding: 8px 12px; border-bottom: 2px solid var(--border); text-align: left;
+    }
+    .future-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; font-size: 13px; }
+    .future-table tr.date-hdr td {
+      background: var(--surface2);
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--muted); padding: 6px 12px; border-bottom: 1px solid var(--border2);
+    }
+    .future-table tr.has-pick td { background: #fdf8e8; }
+    .future-pick { color: var(--accent); font-weight: 700; }
+    .future-pts  { font-family: 'DM Mono', monospace; color: var(--muted); text-align: right; }
+    .matchup-cell { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+    /* ── Points Log ── */
+    .summary-bar {
+      display: flex; gap: 24px; flex-wrap: wrap;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;
+      align-items: flex-end;
+    }
+    .stat-val {
+      font-family: 'DM Mono', monospace; font-size: 28px; font-weight: 700; display: block;
+    }
+    .stat-val.gold  { color: var(--gold); }
+    .stat-val.green { color: var(--win); }
+    .stat-val.red   { color: var(--loss); }
+    .stat-lbl {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+      color: var(--muted); display: block;
+    }
+    .summary-note { font-family: 'Barlow Condensed', sans-serif; font-size: 12px; color: var(--muted2); }
+    .plog-table { width: 100%; border-collapse: collapse; }
+    .plog-table th {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--muted); padding: 8px 12px; border-bottom: 2px solid var(--border); text-align: left;
+    }
+    .plog-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; font-size: 13px; }
+    .round-lbl {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+    }
+    .result-badge {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 11px; font-weight: 800; letter-spacing: .08em;
+      padding: 2px 8px; border-radius: 3px;
+    }
+    .result-badge.correct { color: var(--win);  background: var(--win-bg);  border: 1px solid var(--win-border);  }
+    .result-badge.wrong   { color: var(--loss); background: var(--loss-bg); border: 1px solid var(--loss-border); }
+    .pts-earned { font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 700; }
+    .pts-earned.correct { color: var(--win); }
+    .pts-earned.wrong   { color: var(--muted2); }
+    .pts-sub { font-size: 10px; color: var(--muted); font-weight: 400; }
+    .running-total { font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 700; color: var(--gold); }
+    .no-participant {
+      border: 2px dashed var(--border2); border-radius: 8px;
+      padding: 48px; text-align: center;
+      font-family: 'Barlow Condensed', sans-serif; font-size: 16px; color: var(--muted); letter-spacing: .05em;
+    }
+
+    /* ── Footer ── */
+    #footer { border-top: 1px solid var(--border); padding: 14px 0; margin-top: 32px; }
+    #footer .inner {
+      max-width: var(--max-w); margin: 0 auto; padding: 0 16px;
+      display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .footer-scoring { font-family: 'Barlow Condensed', sans-serif; font-size: 11px; color: var(--muted); letter-spacing: .04em; }
+    .footer-sync    { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted2); }
+
+    /* ── Responsive ── */
+    @media (max-width: 700px) {
+      .masthead-title { font-size: 34px; }
+      .col-runnerup { display: none; }
+      .card-grid, .card-grid.sm { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 480px) { .masthead-title { font-size: 28px; } }
+  </style>
+</head>
+<body>
+
+<!-- Noise texture overlay -->
+<svg id="noise" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+  <filter id="nf">
+    <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/>
+    <feColorMatrix type="saturate" values="0"/>
+  </filter>
+  <rect width="100%" height="100%" filter="url(#nf)"/>
+</svg>
+
+<!-- Masthead -->
+<header id="masthead">
+  <div class="inner">
+    <div>
+      <div class="pool-label">Bob's Family Pool</div>
+      <div class="masthead-title">BRACKET <span>TRACKER</span></div>
+    </div>
+    <div class="masthead-right">
+      <div id="api-badge" class="api-badge sync">
+        <div class="dot"></div>
+        <span id="api-text">LOADING</span>
+      </div>
+      <div class="sync-time" id="sync-time">—</div>
+    </div>
+  </div>
+</header>
+
+<!-- Score Ticker -->
+<div id="ticker">
+  <div class="ticker-label">SCORES</div>
+  <div class="ticker-viewport">
+    <div class="ticker-track" id="ticker-track">
+      <span class="ticker-item">Waiting for game results…</span>
+    </div>
+  </div>
+</div>
+
+<!-- Participant Bar -->
+<div id="pbar">
+  <div class="inner">
+    <span class="pbar-label">Viewing</span>
+    <select id="participant-select">
+      <option value="">— Pool Overview —</option>
+    </select>
+    <button id="share-btn">Share My Link</button>
+    <div class="pbar-tz">
+      <span class="pbar-label">Timezone</span>
+      <select id="tz-select">
+        <option value="Eastern">Eastern</option>
+        <option value="Central" selected>Central</option>
+        <option value="Mountain">Mountain</option>
+        <option value="Pacific">Pacific</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Tab Bar -->
+<div id="tabbar">
+  <div class="inner">
+    <button class="tab-btn active" data-tab="standings">Standings</button>
+    <button class="tab-btn" data-tab="livetoday">Live &amp; Today</button>
+    <button class="tab-btn" data-tab="future">Future</button>
+    <button class="tab-btn" data-tab="pointslog">Points Log</button>
+  </div>
+</div>
+
+<!-- Tab Panels -->
+<main class="wrap">
+  <div id="tab-standings"  class="tab-panel active"><div class="empty-state">Loading standings…</div></div>
+  <div id="tab-livetoday"  class="tab-panel"><div class="empty-state">Loading games…</div></div>
+  <div id="tab-future"     class="tab-panel"><div class="empty-state">Loading schedule…</div></div>
+  <div id="tab-pointslog"  class="tab-panel"><div class="empty-state">Loading…</div></div>
+</main>
+
+<footer id="footer">
+  <div class="inner">
+    <div class="footer-scoring">
+      Scoring: Seed × Round Weight (R1×1, R2×2, S16×4, E8×6, FF×10, Champ×15) · Tiebreaker: most correct picks, then highest-round points
+    </div>
+    <div class="footer-sync" id="footer-sync">ESPN · —</div>
+  </div>
+</footer>
+
+<script src="pool_picks.js"></script>
+<script>
+'use strict';
+
+// ── Safety check ──────────────────────────────────────────────────
+if (typeof PICKS === 'undefined' || typeof R1_MATCHUPS === 'undefined') {
+  document.body.innerHTML =
+    '<div style="padding:48px;font-family:sans-serif;color:#c0392b;max-width:600px;margin:0 auto">' +
+    '<h2 style="margin-bottom:12px">Error: pool_picks.js failed to load</h2>' +
+    '<p>Make sure <code>pool_picks.js</code> is in the same folder as <code>index.html</code>.</p>' +
+    '</div>';
+  throw new Error('pool_picks.js not loaded');
+}
+
+// ── Constants ────────────────────────────────────────────────────
+const ROUND_WEIGHTS  = {1:1, 2:2, 3:4, 4:6, 5:10, 6:15};
+const ROUND_NAMES    = {1:'R1', 2:'R2', 3:'S16', 4:'E8', 5:'FF', 6:'Champ'};
+const REGION_NAMES   = ['East','South','West','Midwest'];
+const GAME_COUNTS    = [0, 32, 16, 8, 4, 2, 1]; // index = round number
+const TIMEZONES = {
+  Eastern: 'America/New_York',
+  Central: 'America/Chicago',
+  Mountain: 'America/Denver',
+  Pacific:  'America/Los_Angeles'
+};
+const ESPN_URL = 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard' +
+                 '?groups=100&dates=20260319-20260407';
+
+const TEAM_INFO = {
+  'duke':         {espnId:'150',    seed:1},
+  'siena':        {espnId:'2561',   seed:16},
+  'ohio-st':      {espnId:'194',    seed:8},
+  'tcu':          {espnId:'2628',   seed:9},
+  'st-johns':     {espnId:'2599',   seed:5},
+  'n-iowa':       {espnId:'2460',   seed:12},
+  'kansas':       {espnId:'2305',   seed:4},
+  'cal-baptist':  {espnId:'2856',   seed:13},
+  'louisville':   {espnId:'97',     seed:6},
+  's-florida':    {espnId:'58',     seed:11},
+  'michigan-st':  {espnId:'127',    seed:3},
+  'n-dakota-st':  {espnId:'2449',   seed:14},
+  'ucla':         {espnId:'26',     seed:7},
+  'ucf':          {espnId:'2116',   seed:10},
+  'uconn':        {espnId:'41',     seed:2},
+  'furman':       {espnId:'231',    seed:15},
+  'florida':      {espnId:'57',     seed:1},
+  'prairie-view': {espnId:'2504',   seed:16},
+  'clemson':      {espnId:'228',    seed:8},
+  'iowa':         {espnId:'2294',   seed:9},
+  'vanderbilt':   {espnId:'238',    seed:5},
+  'mcneese':      {espnId:'2377',   seed:12},
+  'nebraska':     {espnId:'158',    seed:4},
+  'troy':         {espnId:'2653',   seed:13},
+  'n-carolina':   {espnId:'153',    seed:6},
+  'vcu':          {espnId:'2670',   seed:11},
+  'illinois':     {espnId:'356',    seed:3},
+  'penn':         {espnId:'219',    seed:14},
+  'st-marys':     {espnId:'2608',   seed:7},
+  'texas-am':     {espnId:'245',    seed:10},
+  'houston':      {espnId:'248',    seed:2},
+  'idaho':        {espnId:'70',     seed:15},
+  'arizona':      {espnId:'12',     seed:1},
+  'liu':          {espnId:'112358', seed:16},
+  'villanova':    {espnId:'222',    seed:8},
+  'utah-state':   {espnId:'328',    seed:9},
+  'wisconsin':    {espnId:'275',    seed:5},
+  'high-point':   {espnId:'2272',   seed:12},
+  'arkansas':     {espnId:'8',      seed:4},
+  'hawaii':       {espnId:'62',     seed:13},
+  'byu':          {espnId:'252',    seed:6},
+  'texas':        {espnId:'251',    seed:11},
+  'gonzaga':      {espnId:'2250',   seed:3},
+  'kennesaw-st':  {espnId:'338',    seed:14},
+  'miami-fl':     {espnId:'2390',   seed:7},
+  'missouri':     {espnId:'142',    seed:10},
+  'purdue':       {espnId:'2509',   seed:2},
+  'queens':       {espnId:'2511',   seed:15},
+  'michigan':     {espnId:'130',    seed:1},
+  'howard':       {espnId:'47',     seed:16},
+  'georgia':      {espnId:'61',     seed:8},
+  'saint-louis':  {espnId:'139',    seed:9},
+  'texas-tech':   {espnId:'2641',   seed:5},
+  'akron':        {espnId:'2006',   seed:12},
+  'alabama':      {espnId:'333',    seed:4},
+  'hofstra':      {espnId:'2275',   seed:13},
+  'tennessee':    {espnId:'2633',   seed:6},
+  'miami-oh':     {espnId:'193',    seed:11},
+  'virginia':     {espnId:'258',    seed:3},
+  'wright-st':    {espnId:'2750',   seed:14},
+  'kentucky':     {espnId:'96',     seed:7},
+  'santa-clara':  {espnId:'2541',   seed:10},
+  'iowa-state':   {espnId:'66',     seed:2},
+  'tenn-state':   {espnId:'2634',   seed:15},
+};
+
+// Reverse lookup: ESPN ID string → slug
+const ESPN_TO_SLUG = {};
+for (const [slug, info] of Object.entries(TEAM_INFO)) {
+  ESPN_TO_SLUG[String(info.espnId)] = slug;
+}
+
+// All participants (derived from PICKS keys)
+const PARTICIPANTS = Object.keys(PICKS).sort();
+
+// ── Generate match ID lists ───────────────────────────────────────
+function genIds(round, count) {
+  const ids = [];
+  for (let g = 1; g <= count; g++) ids.push('R' + round + 'G' + String(g).padStart(2, '0'));
+  return ids;
+}
+const R1_IDS       = genIds(1, 32);
+const LATER_IDS    = [...genIds(2,16), ...genIds(3,8), ...genIds(4,4), ...genIds(5,2), ...genIds(6,1)];
+const ALL_MATCH_IDS = [...R1_IDS, ...LATER_IDS];
+
+// ── State ─────────────────────────────────────────────────────────
+const GAME_RESULTS = {};   // matchId → {winner, score, final} | {live, clockStr, competitors, network}
+let espnEvents         = [];
+let selectedParticipant = '';
+let selectedTZ          = 'Central';
+let activeTab           = 'standings';
+let lastSyncTime        = null;
+
+// ── Pure helpers ──────────────────────────────────────────────────
+
+function getFeederIds(matchId) {
+  const round = parseInt(matchId[1]);
+  const game  = parseInt(matchId.substring(3));
+  if (round === 1) return null;
+  const p1 = (game - 1) * 2 + 1;
+  const p2 = game * 2;
+  const pr = round - 1;
+  const pad = function(n) { return String(n).padStart(2, '0'); };
+  return ['R' + pr + 'G' + pad(p1), 'R' + pr + 'G' + pad(p2)];
+}
+
+function getMatchTeamSlugs(matchId) {
+  if (matchId.startsWith('R1')) return R1_MATCHUPS[matchId] || null;
+  const feeders = getFeederIds(matchId);
+  if (!feeders) return null;
+  const w1 = GAME_RESULTS[feeders[0]] && GAME_RESULTS[feeders[0]].winner;
+  const w2 = GAME_RESULTS[feeders[1]] && GAME_RESULTS[feeders[1]].winner;
+  if (!w1 || !w2) return null;
+  return [w1, w2];
+}
+
+function getRoundRegionLabel(matchId) {
+  const round = parseInt(matchId[1]);
+  const game  = parseInt(matchId.substring(3));
+  const rn = ROUND_NAMES[round];
+  if (round >= 5) return rn;
+  const divisors = [0, 8, 4, 2, 1];
+  const reg = Math.ceil(game / divisors[round]);
+  return rn + ' · ' + REGION_NAMES[reg - 1];
+}
+
+function isTeamAlive(slug) {
+  for (const matchId of ALL_MATCH_IDS) {
+    const result = GAME_RESULTS[matchId];
+    if (!result || !result.final) continue;
+    const teams = getMatchTeamSlugs(matchId);
+    if (teams && teams.indexOf(slug) !== -1 && result.winner !== slug) return false;
+  }
+  return true;
+}
+
+// CDT-based date string YYYY-MM-DD
+function dateCDT(date) {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit'
+  });
+  const parts = fmt.formatToParts(date);
+  const y = parts.find(function(p) { return p.type === 'year';  }).value;
+  const m = parts.find(function(p) { return p.type === 'month'; }).value;
+  const d = parts.find(function(p) { return p.type === 'day';   }).value;
+  return y + '-' + m + '-' + d;
+}
+function isTodayCDT(dateStr) { return dateCDT(new Date(dateStr)) === dateCDT(new Date()); }
+
+function fmtTime(dateStr, tzKey) {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: TIMEZONES[tzKey] || 'America/Chicago',
+    hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
+  }).format(new Date(dateStr));
+}
+
+function fmtDate(dateStr, tzKey) {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: TIMEZONES[tzKey] || 'America/Chicago',
+    weekday: 'short', month: 'short', day: 'numeric'
+  }).format(new Date(dateStr));
+}
+
+function fmtDateKey(dateStr, tzKey) {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: TIMEZONES[tzKey] || 'America/Chicago',
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  });
+  const parts = fmt.formatToParts(new Date(dateStr));
+  return parts.find(function(p){return p.type==='year';}).value + '-' +
+         parts.find(function(p){return p.type==='month';}).value + '-' +
+         parts.find(function(p){return p.type==='day';}).value;
+}
+
+// Period label for live games (college basketball: halves + OT)
+function periodLabel(period) {
+  if (period === 1) return '1st Half';
+  if (period === 2) return '2nd Half';
+  if (period === 3) return 'OT';
+  return String(period - 2) + 'OT';
+}
+
+// Slug display name fallback
+function slugName(slug) {
+  return slug.split('-').map(function(w){ return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ');
+}
+
+// Build ESPN ID → display name map from loaded events
+function buildNameMap() {
+  var map = {};
+  for (var i = 0; i < espnEvents.length; i++) {
+    var comps = espnEvents[i].competitions[0].competitors;
+    for (var j = 0; j < comps.length; j++) {
+      var t = comps[j].team;
+      if (t && t.id) map[String(t.id)] = t.displayName || t.name || '';
+    }
+  }
+  return map;
+}
+
+// Logo img tag — no nested backticks, plain concatenation
+function logoImg(espnId, size) {
+  if (!espnId || parseInt(espnId, 10) < 0) return '';
+  var s = size || 22;
+  return '<img class="team-logo" width="' + s + '" height="' + s + '" alt="" ' +
+         'onerror="this.style.display=\'none\'" ' +
+         'src="https://a.espncdn.com/i/teamlogos/ncaa/500/' + espnId + '.png">';
+}
+function slugLogo(slug, size) {
+  var info = TEAM_INFO[slug];
+  return info ? logoImg(info.espnId, size) : '';
+}
+
+// Get network from ESPN event
+function evNetwork(ev) {
+  var comp = ev.competitions[0];
+  if (comp.broadcasts && comp.broadcasts[0] && comp.broadcasts[0].names && comp.broadcasts[0].names[0]) {
+    return comp.broadcasts[0].names[0];
+  }
+  if (comp.geoBroadcasts && comp.geoBroadcasts[0] && comp.geoBroadcasts[0].media) {
+    return comp.geoBroadcasts[0].media.shortName || '';
+  }
+  return '';
+}
+
+// ── ESPN poll & game processing ──────────────────────────────────
+
+function processMatchSlot(matchId, events) {
+  var expectedIds;
+  if (matchId.startsWith('R1')) {
+    var slugs = R1_MATCHUPS[matchId];
+    if (!slugs) return;
+    var id0 = TEAM_INFO[slugs[0]] && TEAM_INFO[slugs[0]].espnId;
+    var id1 = TEAM_INFO[slugs[1]] && TEAM_INFO[slugs[1]].espnId;
+    if (!id0 || !id1) return;
+    expectedIds = [String(id0), String(id1)];
+  } else {
+    var feeders = getFeederIds(matchId);
+    if (!feeders) return;
+    var r0 = GAME_RESULTS[feeders[0]];
+    var r1 = GAME_RESULTS[feeders[1]];
+    if (!r0 || !r0.winner || !r1 || !r1.winner) return;
+    var ei0 = TEAM_INFO[r0.winner] && TEAM_INFO[r0.winner].espnId;
+    var ei1 = TEAM_INFO[r1.winner] && TEAM_INFO[r1.winner].espnId;
+    if (!ei0 || !ei1) return;
+    expectedIds = [String(ei0), String(ei1)];
+  }
+
+  var ev = null;
+  for (var i = 0; i < events.length; i++) {
+    var compIds = events[i].competitions[0].competitors.map(function(c){ return String(c.team.id); });
+    if (expectedIds.every(function(id){ return compIds.indexOf(id) !== -1; })) {
+      ev = events[i];
+      break;
+    }
+  }
+  if (!ev) return;
+
+  var state = ev.status && ev.status.type && ev.status.type.state;
+  var comps = ev.competitions[0].competitors;
+
+  if (state === 'post') {
+    var winnerComp = null;
+    for (var wi = 0; wi < comps.length; wi++) { if (comps[wi].winner) { winnerComp = comps[wi]; break; } }
+    if (!winnerComp) {
+      winnerComp = comps.reduce(function(a, b) {
+        return parseInt(a.score || 0, 10) > parseInt(b.score || 0, 10) ? a : b;
+      });
+    }
+    var loserComp = comps.find(function(c){ return c !== winnerComp; });
+    var winSlug = ESPN_TO_SLUG[String(winnerComp.team.id)];
+    if (winSlug) {
+      GAME_RESULTS[matchId] = {
+        winner: winSlug,
+        score: (winnerComp.score || '0') + '-' + (loserComp ? loserComp.score || '0' : '0'),
+        final: true
+      };
+    }
+  } else if (state === 'in') {
+    if (GAME_RESULTS[matchId] && GAME_RESULTS[matchId].final) return; // never overwrite a final
+    var period  = (ev.status && ev.status.period) || 1;
+    var clock   = (ev.status && ev.status.displayClock) || '';
+    var network = evNetwork(ev);
+    var compData = comps.map(function(c) {
+      return {
+        slug:   ESPN_TO_SLUG[String(c.team.id)] || null,
+        espnId: String(c.team.id),
+        name:   c.team.displayName || c.team.name || 'TBD',
+        score:  c.score || '0'
+      };
+    });
+    GAME_RESULTS[matchId] = {
+      live: true,
+      clockStr: clock + ' ' + periodLabel(period),
+      competitors: compData,
+      network: network
+    };
+  } else {
+    // state === 'pre'
+    if (GAME_RESULTS[matchId] && GAME_RESULTS[matchId].live) delete GAME_RESULTS[matchId];
+  }
+}
+
+function setApiStatus(status, timeStr) {
+  var badge = document.getElementById('api-badge');
+  var text  = document.getElementById('api-text');
+  badge.className = 'api-badge ' + status;
+  text.textContent = status === 'ok' ? 'LIVE' : status === 'sync' ? 'SYNCING' : 'ERROR';
+  if (timeStr) {
+    document.getElementById('sync-time').textContent = timeStr;
+    document.getElementById('footer-sync').textContent = 'ESPN · synced ' + timeStr;
+  }
+}
+
+async function poll() {
+  setApiStatus('sync', null);
+  try {
+    var res  = await fetch(ESPN_URL, {cache: 'no-store'});
+    var data = await res.json();
+    espnEvents = data.events || [];
+
+    // Process all rounds in order so R1 results feed R2 matching, etc.
+    for (var round = 1; round <= 6; round++) {
+      var count = GAME_COUNTS[round];
+      for (var g = 1; g <= count; g++) {
+        processMatchSlot('R' + round + 'G' + String(g).padStart(2, '0'), espnEvents);
+      }
+    }
+
+    var now = new Date();
+    lastSyncTime = now.toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit'});
+    setApiStatus('ok', lastSyncTime);
+  } catch (err) {
+    console.error('ESPN poll failed:', err);
+    setApiStatus('err', lastSyncTime);
+  }
+  renderAll();
+}
+
+// ── Build event-by-matchId map (shared by livetoday + future) ────
+function buildEvByMatchId() {
+  var out = {};
+  for (var mi = 0; mi < ALL_MATCH_IDS.length; mi++) {
+    var matchId = ALL_MATCH_IDS[mi];
+    var expectedIds;
+    if (matchId.startsWith('R1')) {
+      var slugs = R1_MATCHUPS[matchId];
+      if (!slugs) continue;
+      var i0 = TEAM_INFO[slugs[0]] && TEAM_INFO[slugs[0]].espnId;
+      var i1 = TEAM_INFO[slugs[1]] && TEAM_INFO[slugs[1]].espnId;
+      if (!i0 || !i1) continue;
+      expectedIds = [String(i0), String(i1)];
+    } else {
+      var feeders = getFeederIds(matchId);
+      if (!feeders) continue;
+      var r0 = GAME_RESULTS[feeders[0]];
+      var r1 = GAME_RESULTS[feeders[1]];
+      if (!r0 || !r0.winner || !r1 || !r1.winner) continue;
+      var ei0 = TEAM_INFO[r0.winner] && TEAM_INFO[r0.winner].espnId;
+      var ei1 = TEAM_INFO[r1.winner] && TEAM_INFO[r1.winner].espnId;
+      if (!ei0 || !ei1) continue;
+      expectedIds = [String(ei0), String(ei1)];
+    }
+    for (var ei = 0; ei < espnEvents.length; ei++) {
+      var compIds = espnEvents[ei].competitions[0].competitors.map(function(c){ return String(c.team.id); });
+      if (expectedIds.every(function(id){ return compIds.indexOf(id) !== -1; })) {
+        out[matchId] = espnEvents[ei];
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+// ── Standings computation ─────────────────────────────────────────
+function computeStandings() {
+  var stats = PARTICIPANTS.map(function(name) {
+    var picks = PICKS[name] || {};
+    var totalPts = 0, wins = 0, losses = 0;
+    var roundPts = {1:0, 2:0, 3:0, 4:0, 5:0, 6:0};
+    for (var mi = 0; mi < ALL_MATCH_IDS.length; mi++) {
+      var matchId = ALL_MATCH_IDS[mi];
+      var result  = GAME_RESULTS[matchId];
+      if (!result || !result.final) continue;
+      var pick = picks[matchId];
+      if (!pick) continue;
+      var round = parseInt(matchId[1], 10);
+      if (result.winner === pick) {
+        var seed = TEAM_INFO[pick] ? TEAM_INFO[pick].seed : 0;
+        var pts  = seed * ROUND_WEIGHTS[round];
+        totalPts += pts; roundPts[round] += pts; wins++;
+      } else { losses++; }
+    }
+    return {name: name, totalPts: totalPts, wins: wins, losses: losses, roundPts: roundPts};
+  });
+
+  stats.sort(function(a, b) {
+    if (b.totalPts !== a.totalPts) return b.totalPts - a.totalPts;
+    if (b.wins     !== a.wins)     return b.wins     - a.wins;
+    for (var r = 6; r >= 1; r--) {
+      if (b.roundPts[r] !== a.roundPts[r]) return b.roundPts[r] - a.roundPts[r];
+    }
+    return 0;
+  });
+
+  // Assign ranks + mark ties
+  var rank = 1;
+  for (var i = 0; i < stats.length; i++) {
+    if (i > 0) {
+      var prev = stats[i-1], curr = stats[i];
+      var same = prev.totalPts === curr.totalPts && prev.wins === curr.wins;
+      if (same) {
+        for (var r2 = 6; r2 >= 1; r2--) { if (prev.roundPts[r2] !== curr.roundPts[r2]) { same = false; break; } }
+      }
+      if (!same) rank = i + 1;
+    }
+    stats[i].rank = rank;
+  }
+  var rankCounts = {};
+  for (var j = 0; j < stats.length; j++) {
+    var r = stats[j].rank;
+    rankCounts[r] = (rankCounts[r] || 0) + 1;
+  }
+  for (var k = 0; k < stats.length; k++) stats[k].tied = rankCounts[stats[k].rank] > 1;
+  return stats;
+}
+
+// ── Render hub ───────────────────────────────────────────────────
+function renderAll() {
+  renderTicker();
+  if      (activeTab === 'standings')  renderStandings();
+  else if (activeTab === 'livetoday')  renderLiveToday();
+  else if (activeTab === 'future')     renderFuture();
+  else if (activeTab === 'pointslog')  renderPointsLog();
+}
+
+// ── Ticker ───────────────────────────────────────────────────────
+function renderTicker() {
+  var nameMap = buildNameMap();
+  var items   = [];
+
+  for (var mi = 0; mi < ALL_MATCH_IDS.length; mi++) {
+    var matchId = ALL_MATCH_IDS[mi];
+    var result  = GAME_RESULTS[matchId];
+    if (!result) continue;
+
+    if (result.live) {
+      var c = result.competitors;
+      var s0 = parseInt(c[0] ? c[0].score : 0, 10);
+      var s1 = parseInt(c[1] ? c[1].score : 0, 10);
+      var n0 = c[0] ? (c[0].name || slugName(c[0].slug || '')) : '?';
+      var n1 = c[1] ? (c[1].name || slugName(c[1].slug || '')) : '?';
+      items.push(
+        '<span class="ticker-item">' +
+        '<span class="ticker-live-badge">LIVE</span> ' +
+        n0 + ' <span class="ticker-score">' + c[0].score + ' — ' + c[1].score + '</span> ' + n1 +
+        ' <span class="ticker-note">| ' + result.clockStr + '</span>' +
+        '</span>'
+      );
+    } else if (result.final) {
+      var winner = result.winner;
+      var teams  = getMatchTeamSlugs(matchId) || [];
+      var loser  = teams.find(function(s){ return s !== winner; }) || null;
+      var winInfo  = TEAM_INFO[winner];
+      var loseInfo = loser ? TEAM_INFO[loser] : null;
+      var winName  = (winInfo  && nameMap[winInfo.espnId])  || slugName(winner);
+      var loseName = (loseInfo && nameMap[loseInfo.espnId]) || (loser ? slugName(loser) : '?');
+      items.push(
+        '<span class="ticker-item">' +
+        winName + ' <span class="ticker-score">' + result.score + '</span> ' + loseName +
+        ' <span class="ticker-note">| FINAL</span>' +
+        '</span>'
+      );
+    }
+  }
+
+  var track = document.getElementById('ticker-track');
+  if (items.length === 0) {
+    track.innerHTML = '<span class="ticker-item">Waiting for game results…</span>';
+    track.style.animationDuration = '0s';
+    return;
+  }
+  var content = items.join('');
+  track.innerHTML = content + content; // duplicate for seamless loop
+  var approxPx = items.length * 230;
+  track.style.animationDuration = Math.max(20, approxPx / 80) + 's';
+}
+
+// ── Standings ────────────────────────────────────────────────────
+function finalistCell(slug, nameMap) {
+  if (!slug) return '<span style="color:var(--muted2)">—</span>';
+  var info   = TEAM_INFO[slug];
+  var name   = (info && nameMap[info.espnId]) || slugName(slug);
+  var alive  = isTeamAlive(slug);
+  var cls    = alive ? 'alive' : 'out';
+  var badge  = alive ? 'ALIVE' : 'OUT';
+  return '<div class="finalist-cell ' + cls + '">' +
+    slugLogo(slug, 22) + ' <span>' + name + '</span>' +
+    ' <span class="finalist-badge ' + cls + '">' + badge + '</span>' +
+    '</div>';
+}
+
+function renderStandings() {
+  var standings = computeStandings();
+  var nameMap   = buildNameMap();
+
+  var html = '<div style="overflow-x:auto"><table class="standings-table">' +
+    '<thead><tr>' +
+    '<th style="text-align:center">#</th>' +
+    '<th>Participant</th>' +
+    '<th class="right">Points</th>' +
+    '<th>W–L</th>' +
+    '<th class="col-runnerup">Runner-Up Pick</th>' +
+    '<th>Champion Pick</th>' +
+    '</tr></thead><tbody>';
+
+  for (var i = 0; i < standings.length; i++) {
+    var s = standings[i];
+    var picks    = PICKS[s.name] || {};
+    var champPick  = picks['R6G01'] || '';
+    var ff1 = picks['R5G01'] || '';
+    var ff2 = picks['R5G02'] || '';
+    var runnerUp = (ff1 === champPick) ? ff2 : ff1;
+    var isYou    = s.name === selectedParticipant;
+    var rankStr  = s.tied ? 'T' + s.rank : String(s.rank);
+    var rankCls  = 'rank-cell' + (s.rank === 1 ? ' rank-1' : s.rank === 2 ? ' rank-2' : s.rank === 3 ? ' rank-3' : '');
+
+    html += '<tr class="' + (isYou ? 'you-row' : '') + '">';
+    html += '<td class="' + rankCls + '">' + rankStr + '</td>';
+    html += '<td class="name-cell">' + s.name + (isYou ? '<span class="you-badge">YOU</span>' : '') + '</td>';
+    html += '<td class="pts-cell">' + s.totalPts + '</td>';
+    html += '<td class="wl-cell">' + s.wins + '–' + s.losses + '</td>';
+    html += '<td class="col-runnerup">' + finalistCell(runnerUp, nameMap) + '</td>';
+    html += '<td>' + finalistCell(champPick, nameMap) + '</td>';
+    html += '</tr>';
+  }
+
+  html += '</tbody></table></div>';
+  document.getElementById('tab-standings').innerHTML = html;
+}
+
+// ── Live & Today ─────────────────────────────────────────────────
+function renderLiveToday() {
+  var picks   = selectedParticipant ? (PICKS[selectedParticipant] || {}) : null;
+  var nameMap = buildNameMap();
+  var evMap   = buildEvByMatchId();
+
+  var inProgress = [], upNext = [], completedToday = [];
+
+  for (var matchId in evMap) {
+    if (!evMap.hasOwnProperty(matchId)) continue;
+    var ev    = evMap[matchId];
+    var state = ev.status && ev.status.type && ev.status.type.state;
+    var dateStr = ev.date || '';
+    if      (state === 'in')                          inProgress.push({matchId: matchId, ev: ev});
+    else if (state === 'pre'  && isTodayCDT(dateStr)) upNext.push({matchId: matchId, ev: ev});
+    else if (state === 'post' && isTodayCDT(dateStr)) completedToday.push({matchId: matchId, ev: ev});
+  }
+
+  var html = '';
+
+  // In Progress
+  html += '<div class="section-block">';
+  html += '<div class="section-hdr"><h2>In Progress</h2><span class="live-badge">LIVE</span></div>';
+  if (inProgress.length === 0) {
+    html += '<div class="empty-state">No games currently in progress</div>';
+  } else {
+    html += '<div class="card-grid">';
+    for (var li = 0; li < inProgress.length; li++) html += buildLiveCard(inProgress[li].matchId, inProgress[li].ev, picks);
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // Up Next Today
+  html += '<div class="section-block">';
+  html += '<div class="section-hdr"><h2>Up Next Today</h2></div>';
+  if (upNext.length === 0) {
+    html += '<div class="empty-state">No more games scheduled today</div>';
+  } else {
+    html += '<div class="card-grid sm">';
+    for (var ui = 0; ui < upNext.length; ui++) html += buildUpcomingCard(upNext[ui].matchId, upNext[ui].ev, picks);
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // Completed Today
+  html += '<div class="section-block">';
+  html += '<div class="section-hdr"><h2>Completed Today</h2><span class="final-badge">FINAL</span></div>';
+  if (completedToday.length === 0) {
+    html += '<div class="empty-state">No completed games yet today</div>';
+  } else {
+    html += '<div class="card-grid">';
+    for (var ci = 0; ci < completedToday.length; ci++) html += buildCompletedCard(completedToday[ci].matchId, completedToday[ci].ev, picks);
+    html += '</div>';
+  }
+  html += '</div>';
+
+  document.getElementById('tab-livetoday').innerHTML = html;
+}
+
+function buildLiveCard(matchId, ev, picks) {
+  var comps   = ev.competitions[0].competitors;
+  var period  = (ev.status && ev.status.period) || 1;
+  var clock   = (ev.status && ev.status.displayClock) || '';
+  var network = evNetwork(ev);
+  var pick    = picks ? picks[matchId] : null;
+
+  var scores  = comps.map(function(c){ return parseInt(c.score || 0, 10); });
+  var leadIdx = scores[0] >= scores[1] ? 0 : 1;
+
+  var html = '<div class="game-card live-card">';
+  html += '<div class="card-top"><span class="card-clock">' + clock + ' ' + periodLabel(period) + '</span>' +
+          '<span>' + (network || '') + '</span></div>';
+
+  for (var i = 0; i < 2 && i < comps.length; i++) {
+    var c    = comps[i];
+    var slug = ESPN_TO_SLUG[String(c.team.id)] || null;
+    var name = c.team.displayName || c.team.name || (slug ? slugName(slug) : 'TBD');
+    var lead = i === leadIdx;
+    var pickTag = '';
+    if (pick && slug === pick) {
+      pickTag = lead ? '<span class="pick-tag winning">YOUR PICK</span>' : '<span class="pick-tag losing">YOUR PICK</span>';
+    }
+    html += '<div class="team-row">';
+    html += '<span>' + (slug ? slugLogo(slug, 28) : '') + '</span>';
+    html += '<span class="team-name ' + (lead ? 'leading' : 'trailing') + '">' + name + ' ' + pickTag + '</span>';
+    html += '<span class="team-score ' + (lead ? 'leading' : 'trailing') + '">' + (c.score || '0') + '</span>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function buildUpcomingCard(matchId, ev, picks) {
+  var comps   = ev.competitions[0].competitors;
+  var dateStr = ev.date || '';
+  var timeStr = dateStr ? fmtTime(dateStr, selectedTZ) : 'TBD';
+  var network = evNetwork(ev);
+  var pick    = picks ? picks[matchId] : null;
+
+  var html = '<div class="upc-card">';
+  html += '<div class="upc-time">' + timeStr + '</div>';
+  html += '<div class="upc-matchup">';
+  for (var i = 0; i < 2 && i < comps.length; i++) {
+    var c      = comps[i];
+    var teamId = String(c.team.id);
+    var isTBD  = parseInt(teamId, 10) < 0;
+    var slug   = isTBD ? null : (ESPN_TO_SLUG[teamId] || null);
+    var name   = isTBD ? '<span style="color:var(--muted2)">TBD</span>'
+                       : (c.team.displayName || c.team.name || (slug ? slugName(slug) : '?'));
+    if (i > 0) html += '<span class="upc-vs">vs</span>';
+    html += '<span>' + (slug ? slugLogo(slug, 22) : '') + ' ' + name + '</span>';
+  }
+  html += '</div>';
+  if (pick) html += '<div class="upc-pick">YOUR PICK: ' + slugName(pick) + '</div>';
+  if (network) html += '<div class="upc-network">' + network + '</div>';
+  html += '</div>';
+  return html;
+}
+
+function buildCompletedCard(matchId, ev, picks) {
+  var comps   = ev.competitions[0].competitors;
+  var result  = GAME_RESULTS[matchId];
+  var pick    = picks ? picks[matchId] : null;
+
+  var winnerComp = comps.find(function(c){ return c.winner; });
+  if (!winnerComp) {
+    winnerComp = comps.reduce(function(a,b){ return parseInt(a.score||0,10) > parseInt(b.score||0,10) ? a : b; });
+  }
+  var loserComp  = comps.find(function(c){ return c !== winnerComp; });
+  var score      = result ? result.score : ((winnerComp.score||'0') + '-' + (loserComp ? loserComp.score||'0' : '0'));
+
+  var html = '<div class="cmp-card">';
+  html += '<div class="cmp-top"><span>FINAL</span><span class="cmp-score">' + score + '</span></div>';
+
+  var ordered = [winnerComp, loserComp].filter(Boolean);
+  for (var i = 0; i < ordered.length; i++) {
+    var c      = ordered[i];
+    var isWin  = i === 0;
+    var slug   = ESPN_TO_SLUG[String(c.team.id)] || null;
+    var name   = c.team.displayName || c.team.name || (slug ? slugName(slug) : 'TBD');
+    var pickTag = '';
+    if (pick && slug) {
+      if (slug === pick && isWin) {
+        var seed = TEAM_INFO[slug] ? TEAM_INFO[slug].seed : 0;
+        var pts  = seed * ROUND_WEIGHTS[parseInt(matchId[1], 10)];
+        pickTag = '<span class="pick-tag winning">✔ YOUR PICK +' + pts + 'pts</span>';
+      } else if (slug === pick && !isWin) {
+        pickTag = '<span class="pick-tag losing">✘ YOUR PICK</span>';
+      }
+    }
+    html += '<div class="team-row ' + (isWin ? 'winner' : 'loser') + '">';
+    html += '<span>' + (slug ? slugLogo(slug, 28) : '') + '</span>';
+    html += '<span class="team-name">' + name + ' ' + pickTag + '</span>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+// ── Future ───────────────────────────────────────────────────────
+function renderFuture() {
+  var picks  = selectedParticipant ? (PICKS[selectedParticipant] || {}) : null;
+  var evMap  = buildEvByMatchId();
+  var future = [];
+
+  for (var matchId in evMap) {
+    if (!evMap.hasOwnProperty(matchId)) continue;
+    var ev    = evMap[matchId];
+    var state = ev.status && ev.status.type && ev.status.type.state;
+    var dateStr = ev.date || '';
+    if (state === 'pre' && dateStr && !isTodayCDT(dateStr)) {
+      future.push({matchId: matchId, ev: ev, dateStr: dateStr});
+    }
+  }
+
+  if (future.length === 0) {
+    document.getElementById('tab-future').innerHTML =
+      '<div class="empty-state">No future games scheduled yet — check back soon</div>';
+    return;
+  }
+
+  future.sort(function(a, b){ return new Date(a.dateStr) - new Date(b.dateStr); });
+
+  // Group by date in user's TZ
+  var dateGroups = {}, dateKeys = [];
+  for (var fi = 0; fi < future.length; fi++) {
+    var item = future[fi];
+    var dk   = fmtDateKey(item.dateStr, selectedTZ);
+    if (!dateGroups[dk]) { dateGroups[dk] = {label: fmtDate(item.dateStr, selectedTZ), items: []}; dateKeys.push(dk); }
+    dateGroups[dk].items.push(item);
+  }
+  dateKeys.sort();
+
+  var html = '<div style="overflow-x:auto"><table class="future-table"><thead><tr>' +
+    '<th>Date &amp; Time</th><th>Matchup</th><th>Network</th><th>Your Pick</th><th class="right">Pot. Pts</th>' +
+    '</tr></thead><tbody>';
+
+  for (var di = 0; di < dateKeys.length; di++) {
+    var dk2   = dateKeys[di];
+    var group = dateGroups[dk2];
+    html += '<tr class="date-hdr"><td colspan="5">' + group.label + '</td></tr>';
+
+    for (var gi = 0; gi < group.items.length; gi++) {
+      var gItem   = group.items[gi];
+      var comps   = gItem.ev.competitions[0].competitors;
+      var timeStr = fmtTime(gItem.dateStr, selectedTZ);
+      var network = evNetwork(gItem.ev) || '—';
+      var pick    = picks ? picks[gItem.matchId] : null;
+      var potPts  = pick && TEAM_INFO[pick] ? String(TEAM_INFO[pick].seed) : '—';
+
+      html += '<tr class="' + (pick ? 'has-pick' : '') + '">';
+      html += '<td><span style="font-family:\'DM Mono\',monospace;font-size:12px">' + timeStr + '</span></td>';
+
+      // Matchup cell
+      html += '<td><div class="matchup-cell">';
+      for (var ci2 = 0; ci2 < 2 && ci2 < comps.length; ci2++) {
+        var c2     = comps[ci2];
+        var tid    = String(c2.team.id);
+        var isTBD  = parseInt(tid, 10) < 0;
+        var slug2  = isTBD ? null : (ESPN_TO_SLUG[tid] || null);
+        var seed2  = slug2 && TEAM_INFO[slug2] ? TEAM_INFO[slug2].seed : null;
+        var tName  = isTBD
+          ? '<span style="color:var(--muted2)">TBD</span>'
+          : (c2.team.displayName || c2.team.name || (slug2 ? slugName(slug2) : '?'));
+        if (ci2 > 0) html += '<span class="upc-vs">vs</span>';
+        html += '<span>' +
+          (slug2 ? slugLogo(slug2, 20) : '') +
+          (seed2 !== null ? ' <span class="seed-chip">' + seed2 + '</span>' : '') +
+          ' ' + tName + '</span>';
+      }
+      html += '</div></td>';
+
+      html += '<td>' + network + '</td>';
+      html += '<td>' + (pick ? '<span class="future-pick">' + slugName(pick) + '</span>' : '<span style="color:var(--muted2)">—</span>') + '</td>';
+      html += '<td class="future-pts">' + potPts + '</td>';
+      html += '</tr>';
+    }
+  }
+
+  html += '</tbody></table></div>';
+  document.getElementById('tab-future').innerHTML = html;
+}
+
+// ── Points Log ───────────────────────────────────────────────────
+function renderPointsLog() {
+  var panel = document.getElementById('tab-pointslog');
+  if (!selectedParticipant) {
+    panel.innerHTML = '<div class="no-participant">Select a participant from the dropdown above to view their points log.</div>';
+    return;
+  }
+
+  var picks   = PICKS[selectedParticipant] || {};
+  var nameMap = buildNameMap();
+  var rows    = [];
+  var running = 0;
+
+  for (var mi = 0; mi < ALL_MATCH_IDS.length; mi++) {
+    var matchId = ALL_MATCH_IDS[mi];
+    var result  = GAME_RESULTS[matchId];
+    if (!result || !result.final) continue;
+    var pick = picks[matchId];
+    if (!pick) continue;
+    var round   = parseInt(matchId[1], 10);
+    var correct = result.winner === pick;
+    var seed    = TEAM_INFO[pick] ? TEAM_INFO[pick].seed : 0;
+    var pts     = correct ? seed * ROUND_WEIGHTS[round] : 0;
+    running += pts;
+    rows.push({matchId: matchId, result: result, pick: pick, correct: correct, pts: pts, round: round, running: running});
+  }
+
+  var totalPts = running;
+  var wins     = rows.filter(function(r){ return r.correct; }).length;
+  var losses   = rows.length - wins;
+
+  var html = '<div class="summary-bar">';
+  html += '<div><span class="stat-val gold">' + totalPts + '</span><span class="stat-lbl">Total Points</span></div>';
+  html += '<div><span class="stat-val green">' + wins + '</span><span class="stat-lbl">Correct Picks</span></div>';
+  html += '<div><span class="stat-val red">' + losses + '</span><span class="stat-lbl">Missed Picks</span></div>';
+  html += '<div class="summary-note" style="padding-bottom:6px">Points = Seed × Round Weight</div>';
+  html += '</div>';
+
+  if (rows.length === 0) {
+    html += '<div class="empty-state">No completed games yet — check back soon!</div>';
+    panel.innerHTML = html;
+    return;
+  }
+
+  html += '<div style="overflow-x:auto"><table class="plog-table"><thead><tr>' +
+    '<th>Round</th><th>Game</th><th>Their Pick</th><th>Result</th><th>Score</th><th>Pts Earned</th><th class="right">Running Total</th>' +
+    '</tr></thead><tbody>';
+
+  for (var ri = 0; ri < rows.length; ri++) {
+    var row       = rows[ri];
+    var roundLbl  = getRoundRegionLabel(row.matchId);
+    var winSlug   = row.result.winner;
+    var teams     = getMatchTeamSlugs(row.matchId) || [];
+    var loseSlug  = teams.find(function(s){ return s !== winSlug; }) || null;
+    var winInfo   = TEAM_INFO[winSlug];
+    var loseInfo  = loseSlug ? TEAM_INFO[loseSlug] : null;
+    var pickInfo  = TEAM_INFO[row.pick];
+    var winName   = (winInfo  && nameMap[winInfo.espnId])  || slugName(winSlug);
+    var loseName  = (loseInfo && nameMap[loseInfo.espnId]) || (loseSlug ? slugName(loseSlug) : '?');
+    var pickName  = (pickInfo && nameMap[pickInfo.espnId]) || slugName(row.pick);
+    var winSeed   = winInfo  ? winInfo.seed  : '?';
+    var loseSeed  = loseInfo ? loseInfo.seed : '?';
+    var pickSeed  = pickInfo ? pickInfo.seed : '?';
+    var weight    = ROUND_WEIGHTS[row.round];
+    var ptsStr    = row.correct ? '+' + row.pts + ' pts' : '0';
+    var ptsSub    = row.correct ? (pickSeed + ' seed × ' + weight + ' wt') : '';
+
+    html += '<tr>';
+    html += '<td><span class="round-lbl">' + roundLbl + '</span></td>';
+
+    // Game cell
+    html += '<td>';
+    html += '<div style="padding:2px 0">' + slugLogo(winSlug, 18) + ' <span class="seed-chip">' + winSeed + '</span> ' + winName +
+            ' <span style="color:var(--muted);font-size:10px;font-family:\'Barlow Condensed\',sans-serif;font-weight:700">W</span></div>';
+    if (loseSlug) {
+      html += '<div style="opacity:.5;padding:2px 0">' + slugLogo(loseSlug, 18) + ' <span class="seed-chip">' + loseSeed + '</span> ' + loseName + '</div>';
+    }
+    html += '</td>';
+
+    // Their pick
+    html += '<td>' + slugLogo(row.pick, 18) + ' <span class="seed-chip">' + pickSeed + '</span> ' + pickName + '</td>';
+
+    // Result
+    html += '<td><span class="result-badge ' + (row.correct ? 'correct' : 'wrong') + '">' +
+            (row.correct ? '✔ Correct' : '✘ Wrong') + '</span></td>';
+
+    // Score
+    html += '<td><span style="font-family:\'DM Mono\',monospace;font-size:12px">' + row.result.score + '</span></td>';
+
+    // Pts earned
+    html += '<td><span class="pts-earned ' + (row.correct ? 'correct' : 'wrong') + '">' + ptsStr + '</span>';
+    if (ptsSub) html += '<br><span class="pts-sub">' + ptsSub + '</span>';
+    html += '</td>';
+
+    // Running total
+    html += '<td class="right"><span class="running-total">' + row.running + '</span></td>';
+    html += '</tr>';
+  }
+
+  html += '</tbody></table></div>';
+  panel.innerHTML = html;
+}
+
+// ── UI Setup ─────────────────────────────────────────────────────
+function setupDropdown() {
+  var sel    = document.getElementById('participant-select');
+  var sorted = PARTICIPANTS.slice().sort();
+  for (var i = 0; i < sorted.length; i++) {
+    var opt = document.createElement('option');
+    opt.value = sorted[i]; opt.textContent = sorted[i];
+    sel.appendChild(opt);
+  }
+  sel.addEventListener('change', function() {
+    selectedParticipant = sel.value;
+    var url = new URL(window.location.href);
+    if (selectedParticipant) url.searchParams.set('p', selectedParticipant.toLowerCase());
+    else url.searchParams.delete('p');
+    history.replaceState(null, '', url.toString());
+    renderAll();
+  });
+}
+
+function setupTabs() {
+  var buttons = document.querySelectorAll('.tab-btn');
+  buttons.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      buttons.forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      activeTab = btn.dataset.tab;
+      document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
+      document.getElementById('tab-' + activeTab).classList.add('active');
+      renderAll();
+    });
+  });
+}
+
+function setupShareBtn() {
+  var btn = document.getElementById('share-btn');
+  btn.addEventListener('click', function() {
+    var url = new URL(window.location.href);
+    if (selectedParticipant) url.searchParams.set('p', selectedParticipant.toLowerCase());
+    navigator.clipboard.writeText(url.toString()).catch(function(){});
+    var orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(function(){ btn.textContent = orig; }, 2000);
+  });
+}
+
+function setupTzSelect() {
+  var sel = document.getElementById('tz-select');
+  sel.addEventListener('change', function() {
+    selectedTZ = sel.value;
+    var url = new URL(window.location.href);
+    url.searchParams.set('tz', selectedTZ);
+    history.replaceState(null, '', url.toString());
+    renderAll();
+  });
+}
+
+function initFromUrl() {
+  var params = new URLSearchParams(window.location.search);
+  var p  = params.get('p');
+  var tz = params.get('tz');
+  if (tz && TIMEZONES[tz]) {
+    selectedTZ = tz;
+    document.getElementById('tz-select').value = tz;
+  }
+  if (p) {
+    var match = PARTICIPANTS.find(function(n){ return n.toLowerCase() === p.toLowerCase(); });
+    if (match) {
+      selectedParticipant = match;
+      document.getElementById('participant-select').value = match;
+    }
+  }
+}
+
+// ── Init ─────────────────────────────────────────────────────────
+setupDropdown();
+setupTabs();
+setupShareBtn();
+setupTzSelect();
+initFromUrl();
+
+poll();
+setInterval(poll, 60000);
+</script>
+</body>
+</html>
