@@ -756,8 +756,13 @@
         background: #fdf8e8;
       }
       .future-pick {
-        color: var(--accent);
+        color: var(--text);
         font-weight: 700;
+      }
+      .future-pick.busted {
+        color: var(--loss);
+        text-decoration: line-through;
+        opacity: 0.7;
       }
       .future-pts {
         font-family: "DM Mono", monospace;
@@ -2293,7 +2298,11 @@
             html +=
               "<td>" +
               (pick
-                ? '<span class="future-pick">' + slugName(pick) + "</span>"
+                ? '<span class="future-pick ' +
+                  (pickAlive ? "" : "busted") +
+                  '">' +
+                  slugName(pick) +
+                  "</span>"
                 : '<span style="color:var(--muted2)">—</span>') +
               "</td>";
             html += '<td class="future-pts">' + potPts + "</td>";
