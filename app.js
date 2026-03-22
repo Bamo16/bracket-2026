@@ -1284,6 +1284,9 @@ function setupTabs() {
       activeTab = btn.dataset.tab;
       document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
       document.getElementById('tab-' + activeTab).classList.add('active');
+      var url = new URL(window.location.href);
+      url.searchParams.set('tab', activeTab);
+      history.replaceState(null, '', url.toString());
       renderAll();
     });
   });
@@ -1347,6 +1350,17 @@ function initFromUrl() {
       refreshInterval = riVal;
       document.getElementById('refresh-select').value = String(riVal);
     }
+  }
+
+  var tab = params.get('tab');
+  var validTabs = ['standings', 'livetoday', 'future', 'pointslog'];
+  if (tab && validTabs.indexOf(tab) !== -1) {
+    activeTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+    var activeBtn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
+    if (activeBtn) activeBtn.classList.add('active');
+    document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
+    document.getElementById('tab-' + tab).classList.add('active');
   }
 
   if (p) {
