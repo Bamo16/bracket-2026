@@ -25,32 +25,14 @@ var ESPN_URL = 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-co
                '?groups=100&dates=20260319-20260407';
 
 var NETWORK_META = {
-  'CBS':    {bg:'#00458B', fg:'#fff',    cdn:'https://a.espncdn.com/i/networks/cbs.png'},
-  'ESPN':   {bg:'#D00000', fg:'#fff',    cdn:'https://a.espncdn.com/i/networks/espn.png'},
-  'ESPN2':  {bg:'#D00000', fg:'#fff',    cdn:'https://a.espncdn.com/i/networks/espn2.png'},
-  'TBS':    {bg:'#0059A8', fg:'#fff',    cdn:'https://a.espncdn.com/i/networks/tbs.png'},
-  'TNT':    {bg:'#1a1a1a', fg:'#c8a84b', cdn:'https://a.espncdn.com/i/networks/tnt.png'},
-  'truTV':  {bg:'#00A9CE', fg:'#fff',    cdn:'https://a.espncdn.com/i/networks/trutv.png'},
-  'TruTV':  {bg:'#00A9CE', fg:'#fff',    cdn:'https://a.espncdn.com/i/networks/trutv.png'},
-  'TRUTV':  {bg:'#00A9CE', fg:'#fff',    cdn:'https://a.espncdn.com/i/networks/trutv.png'},
+  'CBS':       {bg:'#00458B', fg:'#fff',    local:'logos/cbs.svg'},
+  'TBS':       {bg:'#0059A8', fg:'#fff',    local:'logos/tbs.svg'},
+  'TNT':       {bg:'#1a1a1a', fg:'#c8a84b', local:'logos/tnt.svg'},
+  'truTV':     {bg:'#00A9CE', fg:'#fff',    local:'logos/trutv.svg'},
+  'TruTV':     {bg:'#00A9CE', fg:'#fff',    local:'logos/trutv.svg'},
+  'TRUTV':     {bg:'#00A9CE', fg:'#fff',    local:'logos/trutv.svg'},
+  'truTV/TBS': {bg:'#00A9CE', fg:'#fff',    local:'logos/trutv.svg'},
 };
-
-// Preload all network logos up front so cache is warm before first render
-function preloadNetworkLogos() {
-  var seen = {};
-  for (var nm in NETWORK_META) {
-    if (!NETWORK_META.hasOwnProperty(nm)) continue;
-    var cdn = NETWORK_META[nm].cdn;
-    if (seen[cdn]) { networkLogoCache[nm] = networkLogoCache[seen[cdn]] || 'pending'; continue; }
-    seen[cdn] = nm;
-    (function(name, url) {
-      var img = new Image();
-      img.onload  = function() { networkLogoCache[name] = 'loaded'; };
-      img.onerror = function() { networkLogoCache[name] = 'error';  };
-      img.src = url;
-    })(nm, cdn);
-  }
-}
 
 function networkBadge(name) {
   if (!name) return '';
@@ -66,7 +48,8 @@ function networkBadge(name) {
   }
   // img with onerror fallback to colored badge — known to work with ESPN CDN
   var fb = '<span class="net-badge" style="display:none;background:' + meta.bg + ';color:' + meta.fg + '">' + name + '</span>';
-  var img = '<img class="net-logo" src="' + meta.cdn + '" alt="' + name + '" ' +
+  var src = meta.local || meta.cdn || '';
+  var img = '<img class="net-logo" src="' + src + '" alt="' + name + '" ' +
             'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline-flex\'" />';
   return img + fb;
 }
@@ -168,7 +151,6 @@ var liveScoreSnapshot   = {};  // matchId:espnId → score, before each poll
 var scoreChangedSet     = {};  // matchId:espnId → true, populated after poll
 var refreshInterval     = 60;  // seconds
 var refreshTimer        = null;
-var networkLogoCache    = {};  // name → 'loaded' | 'error'
 
 // ── Helpers ──────────────────────────────────────────────────────
 
