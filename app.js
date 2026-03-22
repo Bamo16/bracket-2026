@@ -31,7 +31,6 @@ var NETWORK_META = {
   'truTV':     {bg:'#00A9CE', fg:'#fff',    local:'logos/trutv.svg'},
   'TruTV':     {bg:'#00A9CE', fg:'#fff',    local:'logos/trutv.svg'},
   'TRUTV':     {bg:'#00A9CE', fg:'#fff',    local:'logos/trutv.svg'},
-  'truTV/TBS': {bg:'#00A9CE', fg:'#fff',    local:'logos/trutv.svg'},
 };
 
 function networkBadge(name) {
