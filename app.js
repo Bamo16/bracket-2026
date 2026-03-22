@@ -35,15 +35,40 @@ var NETWORK_META = {
   'TRUTV':  {bg:'#00A9CE', fg:'#fff',    cdn:'https://a.espncdn.com/i/networks/trutv.png'},
 };
 
+// Preload all network logos up front so cache is warm before first render
+function preloadNetworkLogos() {
+  var seen = {};
+  for (var nm in NETWORK_META) {
+    if (!NETWORK_META.hasOwnProperty(nm)) continue;
+    var cdn = NETWORK_META[nm].cdn;
+    if (seen[cdn]) { networkLogoCache[nm] = networkLogoCache[seen[cdn]] || 'pending'; continue; }
+    seen[cdn] = nm;
+    (function(name, url) {
+      var img = new Image();
+      img.onload  = function() { networkLogoCache[name] = 'loaded'; };
+      img.onerror = function() { networkLogoCache[name] = 'error';  };
+      img.src = url;
+    })(nm, cdn);
+  }
+}
+
 function networkBadge(name) {
   if (!name) return '';
-  var meta = NETWORK_META[name] || NETWORK_META[name.toUpperCase()] || null;
+  // Case-insensitive key lookup
+  var key = name;
+  if (!NETWORK_META[key]) {
+    var up = name.toUpperCase();
+    for (var k in NETWORK_META) { if (k.toUpperCase() === up) { key = k; break; } }
+  }
+  var meta = NETWORK_META[key];
   if (!meta) {
     return '<span class="net-badge" style="background:var(--surface2);color:var(--muted);border:1px solid var(--border)">' + name + '</span>';
   }
-  return '<img class="net-logo" src="' + meta.cdn + '" alt="' + name + '" ' +
-         'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline-flex\'" />' +
-         '<span class="net-badge" style="display:none;background:' + meta.bg + ';color:' + meta.fg + '">' + name + '</span>';
+  // img with onerror fallback to colored badge — known to work with ESPN CDN
+  var fb = '<span class="net-badge" style="display:none;background:' + meta.bg + ';color:' + meta.fg + '">' + name + '</span>';
+  var img = '<img class="net-logo" src="' + meta.cdn + '" alt="' + name + '" ' +
+            'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline-flex\'" />';
+  return img + fb;
 }
 
 var TEAM_INFO = {
@@ -143,6 +168,7 @@ var liveScoreSnapshot   = {};  // matchId:espnId → score, before each poll
 var scoreChangedSet     = {};  // matchId:espnId → true, populated after poll
 var refreshInterval     = 60;  // seconds
 var refreshTimer        = null;
+var networkLogoCache    = {};  // name → 'loaded' | 'error'
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -282,6 +308,80 @@ function evNetwork(ev) {
     return comp.geoBroadcasts[0].media.shortName || '';
   }
   return '';
+}
+
+// Parse ESPN event notes headline → {round, region} for fallback matching
+function parseNotesRound(ev) {
+  var notes = ev.competitions[0].notes;
+  if (!notes || !notes[0]) return null;
+  var h = notes[0].headline || '';
+  var round = null, region = null;
+  if      (h.indexOf('First Round')           !== -1) round = 1;
+  else if (h.indexOf('Second Round')          !== -1) round = 2;
+  else if (h.indexOf('Sweet 16')              !== -1) round = 3;
+  else if (h.indexOf('Elite Eight') !== -1 || h.indexOf('Elite 8') !== -1) round = 4;
+  else if (h.indexOf('Final Four')            !== -1) round = 5;
+  else if (h.indexOf('National Championship') !== -1) round = 6;
+  if      (h.indexOf('East')    !== -1) region = 0;
+  else if (h.indexOf('South')   !== -1) region = 1;
+  else if (h.indexOf('West')    !== -1) region = 2;
+  else if (h.indexOf('Midwest') !== -1) region = 3;
+  return {round: round, region: region};
+}
+
+// Returns the feeder slot index (0 or 1) for a TBD competitor,
+// given the other (known) team's slug.
+function getTbdFeederSlot(matchId, knownSlug) {
+  if (matchId.startsWith('R1') || !knownSlug) return 0;
+  var feeders = getFeederIds(matchId);
+  if (!feeders) return 0;
+  var r0 = GAME_RESULTS[feeders[0]];
+  var r1 = GAME_RESULTS[feeders[1]];
+  if (r0 && r0.winner === knownSlug) return 1;
+  if (r1 && r1.winner === knownSlug) return 0;
+  return 0;
+}
+
+// Returns rich HTML for a TBD team slot.
+// If feeder game is settled: returns winner's logo+seed+name (just like a known team).
+// If feeder game is known but unsettled: "Winner of: [logo seed name] vs [logo seed name]"
+// If unknown: plain italic TBD.
+function tbdLabel(matchId, feederSlotIdx) {
+  if (matchId.startsWith('R1')) return '<span style="color:var(--muted2);font-style:italic">TBD</span>';
+  var feeders = getFeederIds(matchId);
+  if (!feeders) return '<span style="color:var(--muted2);font-style:italic">TBD</span>';
+  var fMid    = feeders[feederSlotIdx] || feeders[0];
+  var fResult = GAME_RESULTS[fMid];
+  // Feeder game already decided — treat exactly like a known team
+  if (fResult && fResult.final && fResult.winner) {
+    var ws = fResult.winner;
+    var wi = TEAM_INFO[ws];
+    return (wi ? slugLogo(ws, 20) + ' <span class="seed-chip">' + wi.seed + '</span> ' : '') + slugName(ws);
+  }
+  // Determine the two teams in the feeder game
+  var fTeams;
+  if (fMid.startsWith('R1')) {
+    fTeams = R1_MATCHUPS[fMid];
+  } else {
+    var ff = getFeederIds(fMid);
+    if (ff) {
+      var fw0 = GAME_RESULTS[ff[0]];
+      var fw1 = GAME_RESULTS[ff[1]];
+      fTeams = (fw0 && fw0.winner && fw1 && fw1.winner) ? [fw0.winner, fw1.winner] : null;
+    }
+  }
+  if (!fTeams || fTeams.length < 2) return '<span style="color:var(--muted2);font-style:italic">TBD</span>';
+  var live = fResult && fResult.live;
+  function teamChip(s) {
+    var info = TEAM_INFO[s];
+    return (info ? slugLogo(s, 16) + ' <span class="seed-chip">' + info.seed + '</span> ' : '') + slugName(s);
+  }
+  var liveTag = live ? ' <span style="color:var(--live);font-family:\'Barlow Condensed\',sans-serif;font-size:10px;font-weight:800;letter-spacing:.08em">● LIVE</span>' : '';
+  return '<span style="color:var(--muted);font-family:\'Barlow Condensed\',sans-serif;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Win:</span> ' +
+    teamChip(fTeams[0]) +
+    ' <span class="upc-vs">vs</span> ' +
+    teamChip(fTeams[1]) +
+    liveTag;
 }
 
 // Infer the user's timezone from the browser's IANA zone name
@@ -441,9 +541,15 @@ function startRefreshTimer() {
   refreshTimer = setInterval(poll, refreshInterval * 1000);
 }
 
-// ── buildEvByMatchId ─────────────────────────────────────────────
+// ── buildEvByMatchId — three-pass matching ──────────────────────
+// Pass 1: both teams known  →  match by both ESPN IDs
+// Pass 2: one team known    →  match by single ESPN ID (other is TBD/-1)
+// Pass 3: no teams known    →  match by round+region from notes headline
 function buildEvByMatchId() {
   var out = {};
+  var used = {};   // ESPN event.id → true
+
+  // Pass 1 ─ both teams known
   for (var mi = 0; mi < ALL_MATCH_IDS.length; mi++) {
     var matchId = ALL_MATCH_IDS[mi];
     var expectedIds;
@@ -466,13 +572,78 @@ function buildEvByMatchId() {
       expectedIds = [String(ei0), String(ei1)];
     }
     for (var ei = 0; ei < espnEvents.length; ei++) {
-      var compIds = espnEvents[ei].competitions[0].competitors.map(function(c){ return String(c.team.id); });
-      if (expectedIds.every(function(id){ return compIds.indexOf(id) !== -1; })) {
-        out[matchId] = espnEvents[ei];
-        break;
+      var evA = espnEvents[ei];
+      if (used[evA.id]) continue;
+      var cids = evA.competitions[0].competitors.map(function(c){ return String(c.team.id); });
+      if (expectedIds.every(function(id){ return cids.indexOf(id) !== -1; })) {
+        out[matchId] = evA; used[evA.id] = true; break;
       }
     }
   }
+
+  // Pass 2 ─ exactly one team known (other is TBD)
+  for (var mi2 = 0; mi2 < ALL_MATCH_IDS.length; mi2++) {
+    var mid2 = ALL_MATCH_IDS[mi2];
+    if (out[mid2] || mid2.startsWith('R1')) continue;
+    var feeders2 = getFeederIds(mid2);
+    if (!feeders2) continue;
+    var knownIds2 = [];
+    for (var fi2 = 0; fi2 < 2; fi2++) {
+      var fr2 = GAME_RESULTS[feeders2[fi2]];
+      if (fr2 && fr2.winner) {
+        var info2 = TEAM_INFO[fr2.winner];
+        if (info2) knownIds2.push(String(info2.espnId));
+      }
+    }
+    if (knownIds2.length !== 1) continue;
+    var oneId = knownIds2[0];
+    for (var ei2 = 0; ei2 < espnEvents.length; ei2++) {
+      var evB = espnEvents[ei2];
+      if (used[evB.id]) continue;
+      var cids2 = evB.competitions[0].competitors.map(function(c){ return String(c.team.id); });
+      if (cids2.indexOf(oneId) !== -1) {
+        out[mid2] = evB; used[evB.id] = true; break;
+      }
+    }
+  }
+
+  // Pass 3 ─ no teams known: match by round+region from notes
+  var unmatched3 = ALL_MATCH_IDS.filter(function(mid){ return !out[mid] && !mid.startsWith('R1'); });
+  if (unmatched3.length > 0) {
+    var ROUND_DIVISORS3 = [0, 8, 4, 2, 1];
+    var slotsByRR = {};
+    for (var ui3 = 0; ui3 < unmatched3.length; ui3++) {
+      var mid3   = unmatched3[ui3];
+      var rnd3   = parseInt(mid3[1], 10);
+      var game3  = parseInt(mid3.substring(3), 10);
+      if (rnd3 >= 5) continue;
+      var regIdx = Math.ceil(game3 / ROUND_DIVISORS3[rnd3]) - 1;
+      var rrKey  = rnd3 + ':' + regIdx;
+      if (!slotsByRR[rrKey]) slotsByRR[rrKey] = [];
+      slotsByRR[rrKey].push(mid3);
+    }
+    var evsByRR = {};
+    for (var ei3 = 0; ei3 < espnEvents.length; ei3++) {
+      var evC = espnEvents[ei3];
+      if (used[evC.id]) continue;
+      var st3 = evC.status && evC.status.type && evC.status.type.state;
+      if (st3 !== 'pre') continue;
+      var rr3 = parseNotesRound(evC);
+      if (!rr3 || rr3.round === null || rr3.region === null) continue;
+      var rrKey3 = rr3.round + ':' + rr3.region;
+      if (!evsByRR[rrKey3]) evsByRR[rrKey3] = [];
+      evsByRR[rrKey3].push(evC);
+    }
+    for (var rrk in slotsByRR) {
+      if (!slotsByRR.hasOwnProperty(rrk)) continue;
+      var slots3 = slotsByRR[rrk];
+      var evs3   = evsByRR[rrk] || [];
+      for (var si3 = 0; si3 < slots3.length && si3 < evs3.length; si3++) {
+        out[slots3[si3]] = evs3[si3]; used[evs3[si3].id] = true;
+      }
+    }
+  }
+
   return out;
 }
 
@@ -784,6 +955,14 @@ function buildUpcomingCard(matchId, ev, picks) {
           '<span class="card-clock" style="color:var(--pending)">' + timeStr + '</span>' +
           '<span>' + networkBadge(network) + '</span></div>';
 
+  // Find known slug to determine TBD feeder slots
+  var knownSlugU = null;
+  for (var cp2 = 0; cp2 < comps.length; cp2++) {
+    var ptid2 = String(comps[cp2].team.id);
+    if (parseInt(ptid2, 10) > 0) { knownSlugU = ESPN_TO_SLUG[ptid2] || null; break; }
+  }
+  var tbdCountU = 0;
+
   var pickFoundInGame = false;
   for (var i = 0; i < 2 && i < comps.length; i++) {
     var c      = comps[i];
@@ -791,7 +970,14 @@ function buildUpcomingCard(matchId, ev, picks) {
     var isTBD  = parseInt(teamId, 10) < 0;
     var slug   = isTBD ? null : (ESPN_TO_SLUG[teamId] || null);
     var seed   = slug && TEAM_INFO[slug] ? TEAM_INFO[slug].seed : null;
-    var name   = isTBD ? 'TBD' : (c.team.displayName || c.team.name || (slug ? slugName(slug) : '?'));
+    var name;
+    if (isTBD) {
+      var tbdSlotU = knownSlugU ? getTbdFeederSlot(matchId, knownSlugU) : tbdCountU;
+      tbdCountU++;
+      name = tbdLabel(matchId, tbdSlotU);
+    } else {
+      name = c.team.displayName || c.team.name || (slug ? slugName(slug) : '?');
+    }
     var isMyPick  = !isTBD && pick && slug === pick;
     if (isMyPick) pickFoundInGame = true;
     var pickAlive = isMyPick ? isTeamAlive(slug) : false;
@@ -809,7 +995,7 @@ function buildUpcomingCard(matchId, ev, picks) {
     html += '<div class="team-row">';
     html += '<span>' + (slug ? slugLogo(slug, 28) : '') + '</span>';
     if (seed !== null) html += '<span class="seed-chip">' + seed + '</span>';
-    html += '<span class="team-name' + (isTBD ? '" style="color:var(--muted2)"' : '"') + '>' + name + '</span>';
+    html += '<span class="team-name' + (isTBD ? '" style="color:var(--muted);font-style:italic;font-size:13px"' : '"') + '>' + name + '</span>';
     html += pickTag;
     html += '</div>';
   }
@@ -940,21 +1126,32 @@ function renderFuture() {
       html += '<tr class="' + (pick ? 'has-pick' : '') + '">';
       html += '<td><span style="font-family:\'DM Mono\',monospace;font-size:12px">' + timeStr + '</span></td>';
 
-      html += '<td><div class="matchup-cell">';
+      // Find known slug to determine TBD feeder slot assignment
+      var knownSlugF = null;
+      for (var cp = 0; cp < comps.length; cp++) {
+        var ptid = String(comps[cp].team.id);
+        if (parseInt(ptid, 10) > 0) { knownSlugF = ESPN_TO_SLUG[ptid] || null; break; }
+      }
+      var tbdCountF = 0;
+      html += '<td><div class="matchup-stack">';
       for (var ci2 = 0; ci2 < 2 && ci2 < comps.length; ci2++) {
         var c2    = comps[ci2];
         var tid   = String(c2.team.id);
         var isTBD = parseInt(tid, 10) < 0;
         var slug2 = isTBD ? null : (ESPN_TO_SLUG[tid] || null);
         var seed2 = slug2 && TEAM_INFO[slug2] ? TEAM_INFO[slug2].seed : null;
-        var tName = isTBD
-          ? '<span style="color:var(--muted2)">TBD</span>'
-          : (c2.team.displayName || c2.team.name || (slug2 ? slugName(slug2) : '?'));
-        if (ci2 > 0) html += '<span class="upc-vs">vs</span>';
-        html += '<span>' +
-          (slug2 ? slugLogo(slug2, 20) : '') +
-          (seed2 !== null ? ' <span class="seed-chip">' + seed2 + '</span>' : '') +
-          ' ' + tName + '</span>';
+        var rowContent;
+        if (isTBD) {
+          var tbdSlotF = knownSlugF ? getTbdFeederSlot(gItem.matchId, knownSlugF) : tbdCountF;
+          tbdCountF++;
+          rowContent = tbdLabel(gItem.matchId, tbdSlotF);
+        } else {
+          var tName = c2.team.displayName || c2.team.name || (slug2 ? slugName(slug2) : '?');
+          rowContent = (slug2 ? slugLogo(slug2, 20) : '') +
+            (seed2 !== null ? ' <span class="seed-chip">' + seed2 + '</span>' : '') +
+            ' ' + tName;
+        }
+        html += '<div class="matchup-row' + (ci2 === 1 ? ' matchup-row-2' : '') + '">' + rowContent + '</div>';
       }
       html += '</div></td>';
 
