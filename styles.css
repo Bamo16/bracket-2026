@@ -22,8 +22,36 @@
   --live: #0070c9;
   --live-bg: #e8f4fd;
   --live-border: #90c8f0;
+  --pick-bg: #fdf8e8;
+  --pick-bg-hover: #f9f1d0;
+  --round-hdr-bg: #1a1814;
+  --round-hdr-text: #fff;
   --max-w: 1080px;
 }
+
+[data-theme="dark"] {
+  --bg: #181715;
+  --surface: #232220;
+  --surface2: #2c2a28;
+  --border: #3a3835;
+  --border2: #4a4845;
+  --text: #e8e4dc;
+  --muted: #9a9188;
+  --muted2: #6a6460;
+  --win-bg: #0f2e1a;
+  --win-border: #1f5a34;
+  --loss-bg: #2e1210;
+  --loss-border: #5a2420;
+  --pending-bg: #2a2008;
+  --pending-border: #5a4010;
+  --live-bg: #0a1e30;
+  --live-border: #1a4060;
+  --pick-bg: #2a2208;
+  --pick-bg-hover: #352b0a;
+  --round-hdr-bg: #3a3835;
+  --round-hdr-text: var(--text);
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: 'Barlow', sans-serif;
@@ -57,7 +85,18 @@ body {
   text-transform: uppercase; letter-spacing: -0.01em;
 }
 .masthead-title span { color: var(--accent); }
-.masthead-right { text-align: right; }
+.masthead-right { text-align: right; display: flex; align-items: center; gap: 12px; }
+#theme-toggle {
+  background: none; border: 1px solid var(--border2); border-radius: 6px;
+  width: 32px; height: 32px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: 16px; transition: color .15s, border-color .15s;
+  padding: 0; flex-shrink: 0;
+}
+#theme-toggle:hover { color: var(--text); border-color: var(--text); }
+[data-theme="dark"] .theme-icon-light,
+[data-theme]:not([data-theme="dark"]) .theme-icon-dark,
+:not([data-theme]) .theme-icon-dark { display: none; }
 .api-badge {
   display: inline-flex; align-items: center; gap: 6px;
   font-family: 'Barlow Condensed', sans-serif;
@@ -75,7 +114,7 @@ body {
 
 /* ── Score Ticker ── */
 #ticker {
-  background: var(--text); color: #fff;
+  background: #1c1c1a; color: #fff;
   padding: 9px 0; overflow: hidden;
   display: flex; align-items: center;
 }
@@ -222,9 +261,9 @@ select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle;
 }
 .standings-table tr:last-child td { border-bottom: none; }
-.standings-table tr.you-row  { background: #fdf8e8; }
+.standings-table tr.you-row  { background: var(--pick-bg); }
 .standings-table tbody tr:hover td { background: var(--surface2); }
-.standings-table tbody tr.you-row:hover td { background: #f9f1d0; }
+.standings-table tbody tr.you-row:hover td { background: var(--pick-bg-hover); }
 .rank-cell {
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 15px; font-weight: 800; text-align: center; width: 44px;
@@ -321,7 +360,7 @@ select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
   color: var(--muted); padding: 6px 12px; border-bottom: 1px solid var(--border2);
 }
-.future-table tr.has-pick td { background: #fdf8e8; }
+.future-table tr.has-pick td { background: var(--pick-bg); }
 .future-pick { color: var(--text); font-weight: 700; }
 .future-pick.busted { color: var(--loss); text-decoration: line-through; opacity: .7; }
 .future-pts  { font-family: 'DM Mono', monospace; color: var(--muted); text-align: right; }
@@ -329,6 +368,9 @@ select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 .matchup-stack { display: flex; flex-direction: column; gap: 4px; }
 .matchup-row { display: flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; flex-wrap: wrap; }
 .matchup-row-2 { border-top: 1px solid var(--border); padding-top: 4px; }
+.tbd-feeder { display: flex; flex-direction: column; gap: 2px; }
+.tbd-feeder-label { font-family: 'Barlow Condensed', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.tbd-feeder-teams { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 13px; font-weight: 600; }
 
 /* ── Points Log ── */
 .summary-bar {
@@ -357,7 +399,7 @@ select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 }
 .plog-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; font-size: 13px; }
 .plog-table tr.plog-round-hdr td {
-  background: var(--text); color: #fff;
+  background: var(--round-hdr-bg); color: var(--round-hdr-text);
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
   padding: 7px 12px; border-bottom: none;

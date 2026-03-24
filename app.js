@@ -358,11 +358,10 @@ function tbdLabel(matchId, feederSlotIdx) {
     return (info ? slugLogo(s, 16) + ' <span class="seed-chip">' + info.seed + '</span> ' : '') + slugName(s);
   }
   var liveTag = live ? ' <span style="color:var(--live);font-family:\'Barlow Condensed\',sans-serif;font-size:10px;font-weight:800;letter-spacing:.08em">● LIVE</span>' : '';
-  return '<span style="color:var(--muted);font-family:\'Barlow Condensed\',sans-serif;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Win:</span> ' +
-    teamChip(fTeams[0]) +
-    ' <span class="upc-vs">vs</span> ' +
-    teamChip(fTeams[1]) +
-    liveTag;
+  return '<span class="tbd-feeder">' +
+    '<span class="tbd-feeder-label">winner of</span>' +
+    '<span class="tbd-feeder-teams">' + teamChip(fTeams[0]) + ' <span class="upc-vs">vs</span> ' + teamChip(fTeams[1]) + liveTag + '</span>' +
+    '</span>';
 }
 
 // Infer the user's timezone from the browser's IANA zone name
@@ -1291,6 +1290,23 @@ function setupTabs() {
   });
 }
 
+function setupTheme() {
+  var params = new URLSearchParams(window.location.search);
+  var theme = params.get('theme') || localStorage.getItem('theme') || 'light';
+  if (theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  document.getElementById('theme-toggle').addEventListener('click', function() {
+    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var next = isDark ? 'light' : 'dark';
+    if (next === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('theme', next);
+    var url = new URL(window.location.href);
+    if (next === 'dark') url.searchParams.set('theme', 'dark');
+    else url.searchParams.delete('theme');
+    history.replaceState(null, '', url.toString());
+  });
+}
+
 function setupShareBtn() {
   var btn = document.getElementById('share-btn');
   btn.addEventListener('click', function() {
@@ -1372,6 +1388,7 @@ function initFromUrl() {
 }
 
 // ── Init ─────────────────────────────────────────────────────────
+setupTheme();
 setupDropdown();
 setupTabs();
 setupShareBtn();
