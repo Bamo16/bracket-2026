@@ -226,10 +226,11 @@ select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 10px; font-weight: 800; letter-spacing: .08em;
   padding: 1px 6px; border-radius: 3px; text-transform: uppercase;
+  white-space: nowrap;
 }
 .pick-tag.winning { color: var(--win);  background: var(--win-bg);  border: 1px solid var(--win-border);  }
 .pick-tag.losing  { color: var(--loss); background: var(--loss-bg); border: 1px solid var(--loss-border); }
-.pick-tag.neutral { color: var(--accent); background: var(--pending-bg); border: 1px solid var(--pending-border); }
+.pick-tag.neutral { color: var(--pending); background: var(--pending-bg); border: 1px solid var(--pending-border); }
 
 /* ── Score flip animation ── */
 @keyframes scoreFlip {

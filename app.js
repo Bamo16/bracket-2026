@@ -150,6 +150,7 @@ var liveScoreSnapshot   = {};  // matchId:espnId → score, before each poll
 var scoreChangedSet     = {};  // matchId:espnId → true, populated after poll
 var refreshInterval     = 60;  // seconds
 var refreshTimer        = null;
+var lastPollTime        = 0;   // ms timestamp of last completed poll
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -507,6 +508,7 @@ async function poll() {
     }
 
     var now = new Date();
+    lastPollTime = Date.now();
     lastSyncTime = now.toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit'});
     setApiStatus('ok', lastSyncTime);
   } catch (err) {
@@ -887,10 +889,8 @@ function buildLiveCard(matchId, ev, picks) {
     if (isMyPick) {
       if (!pickAlive) {
         pickTag = ' <span class="pick-tag losing">YOUR PICK \xb7 0pt \u2717 out</span>';
-      } else if (lead) {
-        pickTag = ' <span class="pick-tag winning">YOUR PICK' + (potPts ? ' \xb7 ' + potPts + 'pt' : '') + '</span>';
       } else {
-        pickTag = ' <span class="pick-tag losing">YOUR PICK' + (potPts ? ' \xb7 ' + potPts + 'pt' : '') + '</span>';
+        pickTag = ' <span class="pick-tag neutral">YOUR PICK' + (potPts ? ' \xb7 ' + potPts + 'pt' : '') + '</span>';
       }
     } else {
       pickTag = '';
@@ -912,7 +912,7 @@ function buildLiveCard(matchId, ev, picks) {
     html += '<div class="busted-pick-row">' +
       slugLogo(pick, 18) + ' <span class="seed-chip">' + (pInfo ? pInfo.seed : '?') + '</span>' +
       ' ' + slugName(pick) +
-      ' <span class="pick-tag losing">DID NOT ADVANCE</span>' +
+      ' <span class="pick-tag losing">YOUR PICK \xb7 DID NOT ADVANCE</span>' +
       '</div>';
   }
 
@@ -985,7 +985,7 @@ function buildUpcomingCard(matchId, ev, picks) {
     html += '<div class="busted-pick-row">' +
       slugLogo(pick, 18) + ' <span class="seed-chip">' + (pInfo ? pInfo.seed : '?') + '</span>' +
       ' ' + slugName(pick) +
-      ' <span class="pick-tag losing">DID NOT ADVANCE</span>' +
+      ' <span class="pick-tag losing">YOUR PICK \xb7 DID NOT ADVANCE</span>' +
       '</div>';
   }
 
@@ -1398,3 +1398,10 @@ initFromUrl();
 
 poll();
 startRefreshTimer();
+
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden && Date.now() - lastPollTime > refreshInterval * 1000) {
+    poll();
+    startRefreshTimer();
+  }
+});
